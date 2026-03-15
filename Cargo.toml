@@ -1,0 +1,45 @@
+[package]
+name = "SignetDSA"
+version = "0.1.0"
+edition = "2024"
+description = "A Rust library of digital signature algorithms — classical, threshold, and post-quantum — with a unified factory API."
+authors = ["Minh, Le Duc"]
+license = "MIT"
+keywords = ["cryptography", "signature", "dsa", "ecdsa", "post-quantum"]
+categories = ["cryptography"]
+repository = "https://github.com/MinLee0210/LightDSA"
+homepage = "https://github.com/MinLee0210/LightDSA"
+documentation = "https://docs.rs/LightDSA"
+readme = "README.md"
+rust-version = "1.70"
+
+[dependencies]
+# RSA
+rsa = { version = "0.9", features = ["sha2"] }
+
+# DSA
+dsa = "0.6"
+
+# ECDSA (NIST P-256, pkcs8 for key encoding)
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+
+# EdDSA (Ed25519)
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+
+# Schnorr (BIP340, secp256k1)
+k256 = { version = "0.13", features = ["schnorr"] }
+
+# FROST threshold Schnorr (2-of-3)
+frost-secp256k1 = "2"
+
+# ML-DSA (CRYSTALS-Dilithium, FIPS 204 post-quantum)
+ml-dsa = "0.0.4"
+
+# Hashing
+sha2 = "0.10"
+
+# Randomness
+rand = "0.8"
+
+# RustCrypto signature traits
+signature = "2"
