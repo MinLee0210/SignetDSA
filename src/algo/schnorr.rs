@@ -1,7 +1,12 @@
+//! Schnorr signature (BIP340) implementation.
+//!
+//! Provides the [`Schnorr`] type implementing the [`crate::Signature`] trait
+//! over secp256k1 following the BIP340 standard, backed by the `k256` crate.
+
 use crate::signature::Signature;
 use k256::schnorr::{
-    signature::{Signer, Verifier},
     Signature as SchnorrSignature, SigningKey, VerifyingKey,
+    signature::{Signer, Verifier},
 };
 use rand::rngs::OsRng;
 
@@ -71,8 +76,7 @@ mod tests {
         let message = b"Hello, GrimoireDSA!";
 
         let signature = Schnorr::sign(&private_key, message).expect("Signing failed");
-        let valid =
-            Schnorr::verify(&public_key, message, &signature).expect("Verification failed");
+        let valid = Schnorr::verify(&public_key, message, &signature).expect("Verification failed");
         assert!(valid, "Signature should be valid");
     }
 

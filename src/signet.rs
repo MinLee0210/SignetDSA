@@ -23,6 +23,7 @@
 //! ```
 
 use rand::rngs::OsRng;
+use zeroize::Zeroizing;
 
 // ---------------------------------------------------------------------------
 // Object-safe trait
@@ -37,18 +38,18 @@ pub trait SignetSigner: Send + Sync {
     fn name(&self) -> &'static str;
 
     /// Generate a fresh `(private_key_bytes, public_key_bytes)` pair.
-    fn generate_keys(&self) -> (Vec<u8>, Vec<u8>);
+    ///
+    /// The private key is wrapped in [`Zeroizing`] so its backing memory is
+    /// wiped when it goes out of scope — plain `Vec<u8>` gives no such
+    /// guarantee and would leave secret key material sitting in freed heap
+    /// memory.
+    fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>);
 
     /// Sign `message` using the serialized `private_key`.
     fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String>;
 
     /// Verify that `signature` was produced over `message` by the holder of `public_key`.
-    fn verify(
-        &self,
-        public_key: &[u8],
-        message: &[u8],
-        signature: &[u8],
-    ) -> Result<bool, String>;
+    fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, String>;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +95,7 @@ impl Signet {
 // ---------------------------------------------------------------------------
 
 mod adapters {
-    use super::{OsRng, SignetSigner};
+    use super::{OsRng, SignetSigner, Zeroizing};
 
     // -------------------------------------------------------------------------
     // RSA  — keys serialized as PKCS#1 DER
@@ -102,39 +103,59 @@ mod adapters {
     pub struct RsaAdapter;
 
     impl SignetSigner for RsaAdapter {
-        fn name(&self) -> &'static str { "rsa" }
+        fn name(&self) -> &'static str {
+            "rsa"
+        }
 
-        fn generate_keys(&self) -> (Vec<u8>, Vec<u8>) {
-            use rsa::{RsaPrivateKey, RsaPublicKey};
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
             use rsa::pkcs1::{EncodeRsaPrivateKey, EncodeRsaPublicKey};
+            use rsa::{RsaPrivateKey, RsaPublicKey};
 
             let sk = RsaPrivateKey::new(&mut OsRng, 2048).expect("RSA keygen failed");
             let pk = RsaPublicKey::from(&sk);
             (
-                sk.to_pkcs1_der().expect("RSA sk encode").as_bytes().to_vec(),
-                pk.to_pkcs1_der().expect("RSA pk encode").as_bytes().to_vec(),
+                Zeroizing::new(
+                    sk.to_pkcs1_der()
+                        .expect("RSA sk encode")
+                        .as_bytes()
+                        .to_vec(),
+                ),
+                pk.to_pkcs1_der()
+                    .expect("RSA pk encode")
+                    .as_bytes()
+                    .to_vec(),
             )
         }
 
         fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
+            use ::signature::{RandomizedSigner, SignatureEncoding};
             use rsa::{RsaPrivateKey, pkcs1::DecodeRsaPrivateKey, pkcs1v15::SigningKey};
             use sha2::Sha256;
-            use ::signature::{RandomizedSigner, SignatureEncoding};
 
             let sk = RsaPrivateKey::from_pkcs1_der(private_key).map_err(|e| e.to_string())?;
             let signing_key = SigningKey::<Sha256>::new(sk);
-            Ok(signing_key.sign_with_rng(&mut OsRng, message).to_bytes().to_vec())
+            Ok(signing_key
+                .sign_with_rng(&mut OsRng, message)
+                .to_bytes()
+                .to_vec())
         }
 
-        fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, String> {
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use ::signature::Verifier;
             use rsa::{RsaPublicKey, pkcs1::DecodeRsaPublicKey, pkcs1v15::VerifyingKey};
             use sha2::Sha256;
-            use ::signature::Verifier;
 
             let pk = RsaPublicKey::from_pkcs1_der(public_key).map_err(|e| e.to_string())?;
             let vk = VerifyingKey::<Sha256>::new(pk);
             let sig = rsa::pkcs1v15::Signature::try_from(signature).map_err(|e| e.to_string())?;
-            vk.verify(message, &sig).map(|_| true).map_err(|e| e.to_string())
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
         }
     }
 
@@ -144,25 +165,35 @@ mod adapters {
     pub struct DsaAdapter;
 
     impl SignetSigner for DsaAdapter {
-        fn name(&self) -> &'static str { "dsa" }
+        fn name(&self) -> &'static str {
+            "dsa"
+        }
 
-        fn generate_keys(&self) -> (Vec<u8>, Vec<u8>) {
-            use dsa::{Components, KeySize, SigningKey};
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
             use dsa::pkcs8::{EncodePrivateKey, EncodePublicKey};
+            use dsa::{Components, KeySize, SigningKey};
 
             let components = Components::generate(&mut OsRng, KeySize::DSA_2048_256);
             let sk = SigningKey::generate(&mut OsRng, components);
             let vk = sk.verifying_key().clone();
             (
-                sk.to_pkcs8_der().expect("DSA sk encode").as_bytes().to_vec(),
-                vk.to_public_key_der().expect("DSA pk encode").as_bytes().to_vec(),
+                Zeroizing::new(
+                    sk.to_pkcs8_der()
+                        .expect("DSA sk encode")
+                        .as_bytes()
+                        .to_vec(),
+                ),
+                vk.to_public_key_der()
+                    .expect("DSA pk encode")
+                    .as_bytes()
+                    .to_vec(),
             )
         }
 
         fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
-            use dsa::{SigningKey, pkcs8::DecodePrivateKey};
             use dsa::signature::{DigestSigner, SignatureEncoding};
-            use sha2::{Sha256, Digest};
+            use dsa::{SigningKey, pkcs8::DecodePrivateKey};
+            use sha2::{Digest, Sha256};
 
             let sk = SigningKey::from_pkcs8_der(private_key).map_err(|e| e.to_string())?;
             let digest = Sha256::new_with_prefix(message);
@@ -170,15 +201,23 @@ mod adapters {
             Ok(sig.to_bytes().to_vec())
         }
 
-        fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, String> {
-            use dsa::{VerifyingKey, pkcs8::DecodePublicKey};
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
             use dsa::signature::DigestVerifier;
-            use sha2::{Sha256, Digest};
+            use dsa::{VerifyingKey, pkcs8::DecodePublicKey};
+            use sha2::{Digest, Sha256};
 
             let vk = VerifyingKey::from_public_key_der(public_key).map_err(|e| e.to_string())?;
-            let sig = ::dsa::Signature::try_from(signature).map_err(|_| "Invalid DSA signature bytes".to_string())?;
+            let sig = ::dsa::Signature::try_from(signature)
+                .map_err(|_| "Invalid DSA signature bytes".to_string())?;
             let digest = Sha256::new_with_prefix(message);
-            vk.verify_digest(digest, &sig).map(|_| true).map_err(|e| e.to_string())
+            vk.verify_digest(digest, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
         }
     }
 
@@ -188,33 +227,45 @@ mod adapters {
     pub struct EcdsaAdapter;
 
     impl SignetSigner for EcdsaAdapter {
-        fn name(&self) -> &'static str { "ecdsa" }
+        fn name(&self) -> &'static str {
+            "ecdsa"
+        }
 
-        fn generate_keys(&self) -> (Vec<u8>, Vec<u8>) {
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
             use p256::ecdsa::SigningKey;
 
             let sk = SigningKey::random(&mut OsRng);
             let pk_point = sk.verifying_key().to_encoded_point(true);
-            (sk.to_bytes().to_vec(), pk_point.as_bytes().to_vec())
+            (
+                Zeroizing::new(sk.to_bytes().to_vec()),
+                pk_point.as_bytes().to_vec(),
+            )
         }
 
         fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
-            use p256::ecdsa::{SigningKey, signature::Signer, Signature};
+            use p256::ecdsa::{Signature, SigningKey, signature::Signer};
 
             let sk = SigningKey::from_bytes(private_key.into()).map_err(|e| e.to_string())?;
             let sig: Signature = sk.sign(message);
             Ok(sig.to_bytes().to_vec())
         }
 
-        fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, String> {
-            use p256::ecdsa::{VerifyingKey, Signature, signature::Verifier};
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
             use p256::elliptic_curve::sec1::EncodedPoint;
 
             let point = EncodedPoint::<p256::NistP256>::from_bytes(public_key)
                 .map_err(|e| e.to_string())?;
             let vk = VerifyingKey::from_encoded_point(&point).map_err(|e| e.to_string())?;
             let sig = Signature::try_from(signature).map_err(|e| e.to_string())?;
-            vk.verify(message, &sig).map(|_| true).map_err(|e| e.to_string())
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
         }
     }
 
@@ -224,32 +275,50 @@ mod adapters {
     pub struct EdDsaAdapter;
 
     impl SignetSigner for EdDsaAdapter {
-        fn name(&self) -> &'static str { "eddsa" }
+        fn name(&self) -> &'static str {
+            "eddsa"
+        }
 
-        fn generate_keys(&self) -> (Vec<u8>, Vec<u8>) {
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
             use ed25519_dalek::SigningKey;
 
             let sk = SigningKey::generate(&mut OsRng);
             let pk = sk.verifying_key();
-            (sk.to_bytes().to_vec(), pk.to_bytes().to_vec())
+            (
+                Zeroizing::new(sk.to_bytes().to_vec()),
+                pk.to_bytes().to_vec(),
+            )
         }
 
         fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
-            use ed25519_dalek::{SigningKey, Signer};
+            use ed25519_dalek::{Signer, SigningKey};
 
-            let bytes: [u8; 32] = private_key.try_into().map_err(|_| "EdDSA private key must be 32 bytes".to_string())?;
+            let bytes: [u8; 32] = private_key
+                .try_into()
+                .map_err(|_| "EdDSA private key must be 32 bytes".to_string())?;
             let sk = SigningKey::from_bytes(&bytes);
             Ok(sk.sign(message).to_bytes().to_vec())
         }
 
-        fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, String> {
-            use ed25519_dalek::{VerifyingKey, Signature, Verifier};
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
-            let pk_bytes: [u8; 32] = public_key.try_into().map_err(|_| "EdDSA public key must be 32 bytes".to_string())?;
+            let pk_bytes: [u8; 32] = public_key
+                .try_into()
+                .map_err(|_| "EdDSA public key must be 32 bytes".to_string())?;
             let vk = VerifyingKey::from_bytes(&pk_bytes).map_err(|e| e.to_string())?;
-            let sig_bytes: [u8; 64] = signature.try_into().map_err(|_| "EdDSA signature must be 64 bytes".to_string())?;
+            let sig_bytes: [u8; 64] = signature
+                .try_into()
+                .map_err(|_| "EdDSA signature must be 64 bytes".to_string())?;
             let sig = Signature::from_bytes(&sig_bytes);
-            vk.verify(message, &sig).map(|_| true).map_err(|e| e.to_string())
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
         }
     }
 
@@ -259,30 +328,40 @@ mod adapters {
     pub struct SchnorrAdapter;
 
     impl SignetSigner for SchnorrAdapter {
-        fn name(&self) -> &'static str { "schnorr" }
+        fn name(&self) -> &'static str {
+            "schnorr"
+        }
 
-        fn generate_keys(&self) -> (Vec<u8>, Vec<u8>) {
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
             use k256::schnorr::SigningKey;
 
             let sk = SigningKey::random(&mut OsRng);
             let pk = sk.verifying_key().to_bytes();
-            (sk.to_bytes().to_vec(), pk.to_vec())
+            (Zeroizing::new(sk.to_bytes().to_vec()), pk.to_vec())
         }
 
         fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
-            use k256::schnorr::{SigningKey, signature::Signer, Signature};
+            use k256::schnorr::{Signature, SigningKey, signature::Signer};
 
             let sk = SigningKey::from_bytes(private_key).map_err(|e| e.to_string())?;
             let sig: Signature = sk.sign(message);
             Ok(sig.to_bytes().to_vec())
         }
 
-        fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, String> {
-            use k256::schnorr::{VerifyingKey, Signature, signature::Verifier};
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use k256::schnorr::{Signature, VerifyingKey, signature::Verifier};
 
             let vk = VerifyingKey::from_bytes(public_key).map_err(|e| e.to_string())?;
-            let sig = Signature::try_from(signature).map_err(|_| "Invalid Schnorr signature bytes".to_string())?;
-            vk.verify(message, &sig).map(|_| true).map_err(|e| e.to_string())
+            let sig = Signature::try_from(signature)
+                .map_err(|_| "Invalid Schnorr signature bytes".to_string())?;
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
         }
     }
 
@@ -292,43 +371,47 @@ mod adapters {
     pub struct MlDsaAdapter;
 
     impl SignetSigner for MlDsaAdapter {
-        fn name(&self) -> &'static str { "mldsa" }
+        fn name(&self) -> &'static str {
+            "mldsa"
+        }
 
-        fn generate_keys(&self) -> (Vec<u8>, Vec<u8>) {
-            use ml_dsa::{KeyGen, MlDsa65};
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
+            use ml_dsa::{Generate, KeyExport, MlDsa65, SigningKey, signature::Keypair};
 
-            let kp = MlDsa65::key_gen(&mut OsRng);
-            // encode() returns a fixed-size hybrid_array::Array — .to_vec() works on it
-            let sk_bytes = kp.signing_key().encode().as_slice().to_vec();
-            let pk_bytes = kp.verifying_key().encode().as_slice().to_vec();
-            (sk_bytes, pk_bytes)
+            let sk = SigningKey::<MlDsa65>::generate();
+            let vk = sk.verifying_key();
+            (
+                Zeroizing::new(sk.to_bytes().as_slice().to_vec()),
+                vk.to_bytes().as_slice().to_vec(),
+            )
         }
 
         fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
-            use ml_dsa::{MlDsa65, SigningKey};
-            use ml_dsa::signature::Signer;
-            use signature::SignatureEncoding;
-            use ml_dsa::EncodedSigningKey;
+            use ml_dsa::signature::{SignatureEncoding, Signer};
+            use ml_dsa::{KeyInit, MlDsa65, SigningKey};
 
-            // decode() expects a fixed-size Array; copy the slice into one first
-            let arr = EncodedSigningKey::<MlDsa65>::try_from(private_key)
+            let sk = SigningKey::<MlDsa65>::new_from_slice(private_key)
                 .map_err(|_| "ML-DSA: private key must have the correct length".to_string())?;
-            let sk = SigningKey::<MlDsa65>::decode(&arr);
             let sig = sk.sign(message);
             Ok(sig.to_vec())
         }
 
-        fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, String> {
-            use ml_dsa::{MlDsa65, VerifyingKey};
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
             use ml_dsa::signature::Verifier;
-            use ml_dsa::EncodedVerifyingKey;
+            use ml_dsa::{KeyInit, MlDsa65, VerifyingKey};
 
-            let arr = EncodedVerifyingKey::<MlDsa65>::try_from(public_key)
+            let vk = VerifyingKey::<MlDsa65>::new_from_slice(public_key)
                 .map_err(|_| "ML-DSA: public key must have the correct length".to_string())?;
-            let vk = VerifyingKey::<MlDsa65>::decode(&arr);
             let sig = ml_dsa::Signature::<MlDsa65>::try_from(signature)
                 .map_err(|_| "ML-DSA: invalid signature bytes".to_string())?;
-            vk.verify(message, &sig).map(|_| true).map_err(|e: ml_dsa::Error| e.to_string())
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e: ml_dsa::Error| e.to_string())
         }
     }
 }
@@ -345,7 +428,10 @@ mod tests {
     fn from_name_returns_correct_algorithm() {
         for name in Signet::available() {
             let signer = Signet::from_name(name);
-            assert!(signer.is_some(), "Signet::from_name({name:?}) should return Some");
+            assert!(
+                signer.is_some(),
+                "Signet::from_name({name:?}) should return Some"
+            );
             assert_eq!(signer.unwrap().name(), *name);
         }
     }
@@ -382,10 +468,12 @@ mod tests {
             let signer = Signet::from_name(name).unwrap();
             let (sk, pk) = signer.generate_keys();
 
-            let sig = signer.sign(&sk, message)
+            let sig = signer
+                .sign(&sk, message)
                 .unwrap_or_else(|e| panic!("{name}: sign failed: {e}"));
 
-            let valid = signer.verify(&pk, message, &sig)
+            let valid = signer
+                .verify(&pk, message, &sig)
                 .unwrap_or_else(|e| panic!("{name}: verify failed: {e}"));
 
             assert!(valid, "{name}: signature should be valid");

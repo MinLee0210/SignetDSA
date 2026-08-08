@@ -1,7 +1,12 @@
+//! ECDSA (Elliptic Curve Digital Signature Algorithm) implementation.
+//!
+//! Provides the [`Ecdsa`] type implementing the [`crate::Signature`] trait over
+//! the NIST P-256 curve using SHA-256, backed by the `p256` crate.
+
 use crate::signature::Signature;
 use ::p256::ecdsa::{
-    signature::{Signer, Verifier},
     Signature as EcdsaSignature, SigningKey, VerifyingKey,
+    signature::{Signer, Verifier},
 };
 use rand::rngs::OsRng;
 

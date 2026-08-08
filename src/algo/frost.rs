@@ -1,4 +1,4 @@
-//! FROST (Flexible Round-Optimized Schnorr Threshold) — 2-of-3 threshold signing.
+//! FROST (Flexible Round-Optimized Schnorr Threshold) — t-of-n threshold signing.
 //!
 //! FROST allows `t` out of `n` participants to collaboratively produce a Schnorr
 //! signature without any single party ever holding the full private key. This is
@@ -15,19 +15,24 @@ use frost_secp256k1 as frost;
 use rand::rngs::OsRng;
 use std::collections::BTreeMap;
 
-/// FROST 2-of-3 threshold ceremony.
+/// FROST `min_signers`-of-`max_signers` threshold ceremony.
+///
+/// Simulates a full threshold-signing round: trusted-dealer key generation,
+/// nonce commitment, signature-share production by exactly `min_signers`
+/// participants, and aggregation into a single Schnorr signature.
 ///
 /// Returns `Ok(true)` if the aggregated signature is valid over `message`.
-pub fn ceremony_2_of_3(message: &[u8]) -> Result<bool, frost::Error> {
+pub fn ceremony(min_signers: u16, max_signers: u16, message: &[u8]) -> Result<bool, frost::Error> {
     // --- Key generation: Distributed Key Generation (DKG) -------------------------
     // In production each participant would run this locally and exchange commitments
-    // over a secure channel. Here we simulate all three participants in one process.
+    // over a secure channel. Here we simulate all participants in one process.
 
-    let max_signers = 3;
-    let min_signers = 2; // threshold
-
-    let (shares, public_key_package) =
-        frost::keys::generate_with_dealer(max_signers, min_signers, frost::keys::IdentifierList::Default, &mut OsRng)?;
+    let (shares, public_key_package) = frost::keys::generate_with_dealer(
+        max_signers,
+        min_signers,
+        frost::keys::IdentifierList::Default,
+        OsRng,
+    )?;
 
     // Each participant keeps their own key package.
     let key_packages: BTreeMap<frost::Identifier, frost::keys::KeyPackage> = shares
@@ -46,7 +51,7 @@ pub fn ceremony_2_of_3(message: &[u8]) -> Result<bool, frost::Error> {
     let mut commitments_map: BTreeMap<frost::Identifier, frost::round1::SigningCommitments> =
         BTreeMap::new();
 
-    // Only participants 1 and 2 sign (satisfying the 2-of-3 threshold).
+    // Exactly `min_signers` participants sign, satisfying the threshold.
     for participant_id in key_packages.keys().take(min_signers as usize) {
         let key_package = &key_packages[participant_id];
         let (nonces, commitments) = frost::round1::commit(key_package.signing_share(), &mut OsRng);
@@ -73,7 +78,8 @@ pub fn ceremony_2_of_3(message: &[u8]) -> Result<bool, frost::Error> {
     // The coordinator (any trusted party, or even a public aggregator) combines
     // the shares into a single standard Schnorr signature.
 
-    let aggregated_sig = frost::aggregate(&signing_package, &signature_shares, &public_key_package)?;
+    let aggregated_sig =
+        frost::aggregate(&signing_package, &signature_shares, &public_key_package)?;
 
     // --- Verification -------------------------------------------------------------
     // The result is a normal Schnorr signature verifiable by anyone who has the
@@ -87,6 +93,11 @@ pub fn ceremony_2_of_3(message: &[u8]) -> Result<bool, frost::Error> {
     Ok(is_valid)
 }
 
+/// FROST 2-of-3 threshold ceremony — a convenience alias for [`ceremony(2, 3, message)`](ceremony).
+pub fn ceremony_2_of_3(message: &[u8]) -> Result<bool, frost::Error> {
+    ceremony(2, 3, message)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,6 +106,14 @@ mod tests {
     fn frost_2_of_3_ceremony() {
         let message = b"Hello, GrimoireDSA!";
         let valid = ceremony_2_of_3(message).expect("FROST ceremony failed");
+        assert!(valid, "Aggregated FROST signature should be valid");
+    }
+
+    #[test]
+    fn frost_3_of_5_ceremony() {
+        // Confirm the ceremony generalizes beyond the 2-of-3 default.
+        let message = b"Hello, GrimoireDSA!";
+        let valid = ceremony(3, 5, message).expect("FROST ceremony failed");
         assert!(valid, "Aggregated FROST signature should be valid");
     }
 
@@ -112,14 +131,17 @@ mod tests {
             max_signers,
             min_signers,
             frost::keys::IdentifierList::Default,
-            &mut OsRng,
+            OsRng,
         )
         .expect("DKG failed");
 
         let key_packages: std::collections::BTreeMap<_, _> = shares
             .into_iter()
             .map(|(id, share)| {
-                (id, frost::keys::KeyPackage::try_from(share).expect("Invalid share"))
+                (
+                    id,
+                    frost::keys::KeyPackage::try_from(share).expect("Invalid share"),
+                )
             })
             .collect();
 

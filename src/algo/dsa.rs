@@ -1,10 +1,15 @@
+//! DSA (Digital Signature Algorithm) implementation.
+//!
+//! This module provides the [`Dsa`] type implementing the [`crate::Signature`] trait
+//! via the `dsa` crate, utilizing 2048-bit parameters and SHA-256.
+
 use crate::signature::Signature;
 use ::dsa::{
     Components, KeySize, SigningKey, VerifyingKey,
     signature::{DigestSigner, DigestVerifier, SignatureEncoding},
 };
 use rand::rngs::OsRng;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /// DSA digital signature using 2048-bit parameters and SHA-256.
 pub struct Dsa;
@@ -44,8 +49,7 @@ impl Signature for Dsa {
 
     fn sign(private_key: &Self::PrivateKey, message: &[u8]) -> Result<Vec<u8>, Self::Error> {
         let digest = Sha256::new_with_prefix(message);
-        let sig: ::dsa::Signature = private_key
-            .sign_digest(digest);
+        let sig: ::dsa::Signature = private_key.sign_digest(digest);
         Ok(sig.to_bytes().to_vec())
     }
 

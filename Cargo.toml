@@ -11,7 +11,7 @@ repository = "https://github.com/MinLee0210/LightDSA"
 homepage = "https://github.com/MinLee0210/LightDSA"
 documentation = "https://docs.rs/LightDSA"
 readme = "README.md"
-rust-version = "1.70"
+rust-version = "1.85"
 
 [dependencies]
 # RSA
@@ -33,7 +33,9 @@ k256 = { version = "0.13", features = ["schnorr"] }
 frost-secp256k1 = "2"
 
 # ML-DSA (CRYSTALS-Dilithium, FIPS 204 post-quantum)
-ml-dsa = "0.0.4"
+# NOTE: must stay >=0.1.0-rc.3 — earlier versions carry RUSTSEC-2025-0144,
+# a timing side-channel in the decompose step that can leak signing-key data.
+ml-dsa = { version = "0.1", features = ["zeroize"] }
 
 # Hashing
 sha2 = "0.10"
@@ -43,3 +45,6 @@ rand = "0.8"
 
 # RustCrypto signature traits
 signature = "2"
+
+# Zeroize secret key bytes on drop
+zeroize = "1.8"

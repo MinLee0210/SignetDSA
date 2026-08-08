@@ -1,7 +1,7 @@
 # SignetDSA
 
 A Rust library implementing digital signature algorithms — classical, threshold,
-and post-quantum — backed by audited cryptographic crates.
+and post-quantum — backed by the RustCrypto ecosystem crates.
 
 ## Algorithms
 
@@ -12,8 +12,22 @@ and post-quantum — backed by audited cryptographic crates.
 | **ECDSA** | Classical | NIST P-256 + SHA-256 | `p256` |
 | **EdDSA** | Classical | Curve25519 (Ed25519) | `ed25519-dalek` |
 | **Schnorr** | Deterministic | BIP340 / secp256k1 | `k256` |
-| **FROST** | Threshold (2-of-3) | Schnorr over secp256k1 | `frost-secp256k1` |
+| **FROST** | Threshold (t-of-n) | Schnorr over secp256k1 | `frost-secp256k1` |
 | **ML-DSA** | Post-quantum | FIPS 204 / Dilithium-65 | `ml-dsa` |
+
+### Known limitations
+
+- **RSA** — the underlying `rsa` crate carries an open, unfixed advisory,
+  [RUSTSEC-2023-0071][marvin] ("Marvin Attack"), covering timing side-channels
+  in signing/decryption. Avoid it where an attacker can measure signing
+  latency; prefer ECDSA, EdDSA, or Schnorr otherwise.
+- **ML-DSA** — the `ml-dsa` crate has not undergone an independent security
+  audit. Pin `ml-dsa >= 0.1.0-rc.3`; earlier versions carry
+  [RUSTSEC-2025-0144][mldsa-timing], a timing side-channel in signature
+  generation.
+
+[marvin]: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
+[mldsa-timing]: https://rustsec.org/advisories/RUSTSEC-2025-0144.html
 
 
 ## Two APIs

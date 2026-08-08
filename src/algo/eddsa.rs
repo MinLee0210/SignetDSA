@@ -1,9 +1,10 @@
+//! EdDSA (Edwards-curve Digital Signature Algorithm) implementation.
+//!
+//! Provides the [`EdDsa`] type implementing the [`crate::Signature`] trait over
+//! Curve25519 (Ed25519), backed by the `ed25519-dalek` crate.
+
 use crate::signature::Signature;
-use ed25519_dalek::{
-    Signature as Ed25519Signature,
-    Signer, Verifier,
-    SigningKey, VerifyingKey,
-};
+use ed25519_dalek::{Signature as Ed25519Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 
 /// EdDSA digital signature over Curve25519 (Ed25519).

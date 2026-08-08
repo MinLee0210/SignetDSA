@@ -1,8 +1,11 @@
+//! ML-DSA (CRYSTALS-Dilithium) post-quantum signature implementation.
+//!
+//! Provides the [`MlDsa`] type implementing the [`crate::Signature`] trait
+//! for ML-DSA-65 (FIPS 204), backed by the `ml-dsa` crate.
+
 use crate::signature::Signature;
-use ml_dsa::{KeyGen, MlDsa65, SigningKey, VerifyingKey};
-use ml_dsa::signature::{Signer, Verifier};
-use signature::SignatureEncoding;
-use rand::rngs::OsRng;
+use ml_dsa::signature::{Keypair, SignatureEncoding, Signer, Verifier};
+use ml_dsa::{Generate, MlDsa65, SigningKey, VerifyingKey};
 
 /// ML-DSA-65 (CRYSTALS-Dilithium), NIST FIPS 204.
 ///
@@ -42,9 +45,8 @@ impl Signature for MlDsa {
     type Error = MlDsaError;
 
     fn generate_keys() -> (Self::PrivateKey, Self::PublicKey) {
-        let kp = MlDsa65::key_gen(&mut OsRng);
-        let signing_key = kp.signing_key().clone();
-        let verifying_key = kp.verifying_key().clone();
+        let signing_key = SigningKey::<MlDsa65>::generate();
+        let verifying_key = signing_key.verifying_key();
         (signing_key, verifying_key)
     }
 
@@ -99,6 +101,10 @@ mod tests {
         let (private_key, _) = MlDsa::generate_keys();
         let message = b"Hello, GrimoireDSA!";
         let signature = MlDsa::sign(&private_key, message).expect("Signing failed");
-        assert_eq!(signature.len(), 3309, "ML-DSA-65 signature should be 3309 bytes");
+        assert_eq!(
+            signature.len(),
+            3309,
+            "ML-DSA-65 signature should be 3309 bytes"
+        );
     }
 }

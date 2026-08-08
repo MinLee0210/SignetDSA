@@ -1,13 +1,31 @@
+//! RSA signature algorithm implementation.
+//!
+//! Provides the [`Rsa`] struct, implementing the [`crate::Signature`] trait using
+//! PKCS#1 v1.5 padding and SHA-256, backed by the `rsa` crate.
+
 use crate::signature::Signature;
 use ::rsa::{
-    pkcs1v15::{SigningKey, VerifyingKey},
     RsaPrivateKey, RsaPublicKey,
+    pkcs1v15::{SigningKey, VerifyingKey},
 };
+use ::signature::{RandomizedSigner, SignatureEncoding, Verifier};
 use rand::rngs::OsRng;
 use sha2::Sha256;
-use ::signature::{RandomizedSigner, SignatureEncoding, Verifier};
 
 /// RSA digital signature using PKCS#1 v1.5 padding with SHA-256.
+///
+/// # Security note
+///
+/// The `rsa` crate has an open, unfixed advisory — [RUSTSEC-2023-0071]
+/// ("Marvin Attack") — covering timing side-channels in RSA signing and
+/// decryption. It is only exploitable by an attacker able to measure signing
+/// latency (e.g. over a shared network or as a co-tenant on the same
+/// machine); local, non-adversarial use is unaffected. Avoid this algorithm
+/// for signing in settings where such timing observation is possible, and
+/// prefer [`crate::algo::ecdsa::Ecdsa`], [`crate::algo::eddsa::EdDsa`], or
+/// [`crate::algo::schnorr::Schnorr`] where a classical scheme is acceptable.
+///
+/// [RUSTSEC-2023-0071]: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
 pub struct Rsa;
 
 #[derive(Debug)]
@@ -37,8 +55,8 @@ impl Signature for Rsa {
     type Error = RsaError;
 
     fn generate_keys() -> (Self::PrivateKey, Self::PublicKey) {
-        let private_key = RsaPrivateKey::new(&mut OsRng, 2048)
-            .expect("Failed to generate RSA private key");
+        let private_key =
+            RsaPrivateKey::new(&mut OsRng, 2048).expect("Failed to generate RSA private key");
         let public_key = RsaPublicKey::from(&private_key);
         (private_key, public_key)
     }
