@@ -1,198 +1,195 @@
 # SignetDSA
 
-A Rust library implementing digital signature algorithms — classical, threshold,
-and post-quantum — backed by the RustCrypto ecosystem crates.
+<div align="center">
 
-## Documentation
+[![CI](https://github.com/MinLee0210/SignetDSA/actions/workflows/ci.yml/badge.svg)](https://github.com/MinLee0210/SignetDSA/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://minlee0210.github.io/SignetDSA)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Post-Quantum Ready](https://img.shields.io/badge/Post--Quantum-FIPS%20204%20(ML--DSA)-green.svg)](https://csrc.nist.gov/pubs/fips/204/final)
 
-**https://minlee0210.github.io/SignetDSA** — per-algorithm deep dives
-(theory, pseudocode, complexity), feature guides, a CLI reference, security
-notes, and architecture. Built with [MkDocs](https://www.mkdocs.org/) +
-[Material](https://squidfunk.github.io/mkdocs-material/) from
-[`docs/`](docs/), and deployed to GitHub Pages by
-[`.github/workflows/docs.yml`](.github/workflows/docs.yml) on every push to
-`main` that touches `docs/` or `mkdocs.yml`.
+**Enterprise-grade digital signature library in Rust — classical, threshold, aggregatable, and post-quantum schemes with a unified factory API and JWS token support.**
 
-To run it locally:
+[Documentation](https://minlee0210.github.io/SignetDSA) • [Algorithm Selection Guide](https://minlee0210.github.io/SignetDSA/learn/choosing_an_algorithm/) • [CLI Reference](https://minlee0210.github.io/SignetDSA/cli/) • [Benchmarks](https://minlee0210.github.io/SignetDSA/features/benchmarking/)
 
-```bash
-pip install -r requirements-docs.txt
-mkdocs serve   # http://127.0.0.1:8000
+</div>
+
+---
+
+## Overview (Bottom Line Up Front)
+
+**SignetDSA** provides a unified interface for digital signatures in Rust. It eliminates fragmented cryptographic APIs by offering two complementary paradigms:
+
+1. **Typed Static API (`Signature`)**: Zero-cost, compile-time verified static trait with associated types (`type PrivateKey`, `type PublicKey`, `type Error`).
+2. **Object-Safe Factory API (`Signet` / `SignetSigner`)**: Runtime dynamic algorithm selection inspired by HuggingFace's `AutoTokenizer.from_pretrained()`, featuring automatic memory zeroization (`zeroize::Zeroizing`) for secret keys.
+
+Additionally, SignetDSA includes high-level utilities for **JSON Web Signatures (JWS RFC 7515)**, **self-contained signed envelopes**, and built-in **micro-benchmarking**.
+
+---
+
+## Supported Digital Signature Schemes
+
+| Algorithm | Category | Classical Security | Private Key | Public Key | Signature | Standard / Specification | Underlying Crate |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **RSA** | Classical | ~112-bit (2048b) | ~1.2 KB (DER) | ~270 B (DER) | 256 B | PKCS#1 v1.5 / RFC 8017 | `rsa` |
+| **RSA-PSS** | Modern Classical | ~112-bit (2048b) | ~1.2 KB (DER) | ~270 B (DER) | 256 B | RSASSA-PSS / RFC 8017 / FIPS 186-5 | `rsa` |
+| **DSA** | Classical | ~112-bit (2048b) | ~617 B (DER) | ~843 B (DER) | ~71 B (DER) | FIPS 186-4 | `dsa` |
+| **ECDSA (P-256)** | Classical | ~128-bit | 32 B | 33 B (compressed) | 64 B | NIST FIPS 186-5 / SEC1 | `p256` |
+| **ECDSA (P-384)** | Classical (CNSA) | ~192-bit | 48 B | 49 B (compressed) | 96 B | NIST FIPS 186-5 / RFC 6979 | `p384` |
+| **ECDSA (secp256k1)** | Classical (Blockchain) | ~128-bit | 32 B | 33 B (compressed) | 64 B | SECG / Ethereum `ecrecover` | `k256` |
+| **EdDSA (Ed25519)** | Fast Classical | ~128-bit | 32 B | 32 B | 64 B | RFC 8032 §5.1 | `ed25519-dalek` |
+| **Ed448 (Goldilocks)** | High-Margin Classical | ~224-bit | 57 B | 57 B | 114 B | RFC 8032 §5.2 | `ed448-goldilocks-plus` |
+| **Schnorr (BIP340)** | Deterministic | ~128-bit | 32 B | 32 B (x-only) | 64 B | Bitcoin BIP340 / Taproot | `k256` |
+| **FROST** | Threshold (t-of-n) | ~128-bit | *Split shares* | 32 B (group key) | 64 B | IETF FROST Draft / BIP340 | `frost-secp256k1` |
+| **BLS (BLS12-381)** | Aggregatable | ~128-bit | 32 B | 48 B (G1) | 96 B (G2) | IRTF CFRG BLS Draft | `bls-signatures` |
+| **ML-DSA (Dilithium-65)** | Post-Quantum | NIST Level 3 (~192b) | 4032 B | 1952 B | 3309 B | NIST FIPS 204 (Module-Lattice) | `ml-dsa` |
+
+---
+
+## Feature Matrix & Specialized Capabilities
+
+- **JSON Web Signatures (JWS RFC 7515)**: Compact token generation and validation (`JwsCompact`) across all supported algorithms.
+- **Signed Envelopes**: Self-verifying portable JSON messages (`SignetEnvelope`) with embedded public keys and timestamps.
+- **Micro-Benchmarking**: In-process benchmarking harness (`Signet::benchmark_all`) reporting ops/sec, latency, and key/sig byte counts.
+- **ECDSA Public-Key Recovery**: Reconstruct public keys from `(message, signature, recovery_id)` (`EcdsaSecp256k1::recover_public_key`).
+- **BLS Signature Aggregation**: Condense $N$ signatures over $N$ distinct messages into a single 96-byte signature verified via a single pairing equation.
+- **Batch Verification**: Multi-signature parallel verification for Ed25519 (`EdDsa::verify_batch`).
+- **PKCS#8 / SPKI PEM Import-Export**: Standard OpenSSL interoperable key encoding for RSA, RSA-PSS, DSA, ECDSA (P-256/P-384), and Ed25519.
+
+---
+
+## Quick Start
+
+Add SignetDSA to your `Cargo.toml`:
+
+```toml
+[dependencies]
+SignetDSA = { git = "https://github.com/MinLee0210/SignetDSA" }
 ```
 
-## Algorithms
-
-| Algorithm | Category | Key Scheme | Crate |
-|-----------|----------|------------|-------|
-| **RSA** | Classical | PKCS#1 v1.5 + SHA-256 | `rsa` |
-| **DSA** | Classical | 2048-bit + SHA-256 | `dsa` |
-| **ECDSA** | Classical | NIST P-256 + SHA-256 | `p256` |
-| **ECDSA/secp256k1** | Classical | Bitcoin/Ethereum curve + SHA-256, with `ecrecover`-style public-key recovery | `k256` |
-| **EdDSA** | Classical | Curve25519 (Ed25519) | `ed25519-dalek` |
-| **Ed448** | Classical | Curve448 "Goldilocks" (~224-bit security margin) | `ed448-goldilocks-plus` |
-| **Schnorr** | Deterministic | BIP340 / secp256k1 | `k256` |
-| **FROST** | Threshold (t-of-n) | Schnorr over secp256k1 | `frost-secp256k1` |
-| **BLS** | Aggregatable | BLS12-381 (basic scheme) | `bls-signatures` |
-| **ML-DSA** | Post-quantum | FIPS 204 / Dilithium-65 | `ml-dsa` |
-
-### Known limitations
-
-- **RSA** — the underlying `rsa` crate carries an open, unfixed advisory,
-  [RUSTSEC-2023-0071][marvin] ("Marvin Attack"), covering timing side-channels
-  in signing/decryption. Avoid it where an attacker can measure signing
-  latency; prefer ECDSA, EdDSA, or Schnorr otherwise.
-- **ML-DSA** — the `ml-dsa` crate has not undergone an independent security
-  audit. Pin `ml-dsa >= 0.1.0-rc.3`; earlier versions carry
-  [RUSTSEC-2025-0144][mldsa-timing], a timing side-channel in signature
-  generation.
-- **Ed448** — `ed448-goldilocks-plus` is a less battle-tested implementation
-  than `ed25519-dalek` (no independent audit, smaller deployment base).
-  Verified against the official RFC 8032 §7.4 test vectors here, but prefer
-  Ed25519 unless Ed448's larger security margin is specifically required.
-- **BLS** — aggregation is only safe over **distinct** messages; the
-  `bls-signatures` crate enforces this and refuses to verify an aggregate
-  built from repeated messages (the classic BLS rogue-key setup). Same-message
-  multisig needs a separate proof-of-possession scheme this crate does not
-  provide. See the `# Rogue public-key attacks` section in
-  [`src/algo/bls.rs`](src/algo/bls.rs).
-
-[marvin]: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-[mldsa-timing]: https://rustsec.org/advisories/RUSTSEC-2025-0144.html
-
-### Interoperability
-
-Ed25519, Ed448, and Schnorr are checked against the official specification
-test vectors, not just internal round-trip consistency — see
-[`tests/rfc8032_ed25519.rs`](tests/rfc8032_ed25519.rs) (RFC 8032 §7.1),
-[`tests/rfc8032_ed448.rs`](tests/rfc8032_ed448.rs) (RFC 8032 §7.4), and
-[`tests/bip340_schnorr.rs`](tests/bip340_schnorr.rs) (the full [BIP340 CSV
-vectors][bip340-vectors], including its invalid-signature edge cases).
-
-Schnorr signing/verification go through k256's `sign_prehash`/`verify_prehash`
-(`PrehashSigner`/`PrehashVerifier`), which feed the message directly into the
-BIP340 challenge hash with a fixed all-zero `aux_rand`, matching the standard
-exactly and keeping signatures deterministic. k256 also exposes plain
-`Signer`/`Verifier`, but those SHA-256-hash the message first — a variant that
-would not interoperate with real Bitcoin Taproot signatures over the same
-message, so this crate does not use it.
-
-[bip340-vectors]: https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv
-
-## Extra capabilities beyond sign/verify
-
-A few algorithms expose functionality the generic `Signature` trait has no
-room for (each as inherent associated functions alongside the trait impl):
-
-- **ECDSA/secp256k1 public-key recovery** — `EcdsaSecp256k1::sign_recoverable`
-  returns a signature plus a 1-byte recovery id; `EcdsaSecp256k1::recover_public_key`
-  reconstructs the signer's public key from `(message, signature, recovery_id)`
-  alone, the pattern behind Ethereum's `ecrecover`.
-- **BLS aggregation** — `Bls::aggregate_signatures` combines many signatures
-  into one the same size as a single signature; `Bls::verify_aggregated`
-  checks it against the list of `(message, public_key)` pairs it covers.
-- **Ed25519 batch verification** — `EdDsa::verify_batch` verifies many
-  `(message, public_key, signature)` triples in one call, faster than
-  verifying each individually (at the cost of not identifying which one
-  failed, if any did).
-- **PKCS#8/SPKI PEM import-export** — `Ecdsa`, `EdDsa`, `Rsa`, and `Dsa` each
-  have `private_key_to_pem`/`private_key_from_pem` and
-  `public_key_to_pem`/`public_key_from_pem`, for interop with keys generated
-  by OpenSSL or other PKCS#8-speaking tools.
-
-## Command-line interface
-
-The `signetdsa` binary exposes the factory API from the shell — keys and
-signatures are stored as hex-encoded text files:
-
-```console
-$ cargo run --bin signetdsa -- list
-rsa
-dsa
-ecdsa
-ecdsa-secp256k1
-eddsa
-ed448
-schnorr
-mldsa
-bls
-
-$ cargo run --bin signetdsa -- keygen --algo ed25519 --priv-out alice.key --pub-out alice.pub
-$ cargo run --bin signetdsa -- sign --algo ed25519 --key alice.key --message "hello" --sig-out hello.sig
-$ cargo run --bin signetdsa -- verify --algo ed25519 --pubkey alice.pub --message "hello" --sig hello.sig
-VALID
-```
-
-`sign`/`verify` also accept `--message-file <path>` for messages that don't
-fit on a command line. `verify` exits non-zero on an invalid signature or
-parse error.
-
-## Two APIs
-
-### 1. Typed API — `Signature` trait
-
-Each algorithm implements the `Signature` trait with its own key types:
-
-```rust
-pub trait Signature {
-    type PrivateKey;
-    type PublicKey;
-    type Error;
-
-    fn generate_keys() -> (Self::PrivateKey, Self::PublicKey);
-    fn sign(private_key: &Self::PrivateKey, message: &[u8]) -> Result<Vec<u8>, Self::Error>;
-    fn verify(public_key: &Self::PublicKey, message: &[u8], signature: &[u8]) -> Result<bool, Self::Error>;
-}
-```
-
-Usage:
-
-```rust
-use SignetDSA::algo::ecdsa::Ecdsa;
-use SignetDSA::Signature;
-
-let (sk, pk) = Ecdsa::generate_keys();
-let sig = Ecdsa::sign(&sk, b"Hello, world!").unwrap();
-assert!(Ecdsa::verify(&pk, b"Hello, world!", &sig).unwrap());
-```
-
-### 2. Factory API — `Signet::from_name()`
-
-Select an algorithm by name at runtime, behind a unified `SignetSigner` interface.
-Inspired by HuggingFace's `AutoTokenizer.from_pretrained()`.
+### 1. Dynamic Factory API
 
 ```rust
 use SignetDSA::{Signet, SignetSigner};
 
-let signer = Signet::from_name("ecdsa").expect("Unknown algorithm");
+// 1. Select algorithm dynamically at runtime
+let signer = Signet::from_name("eddsa").expect("valid algorithm");
 
-let (sk, pk) = signer.generate_keys();
-let sig = signer.sign(&sk, b"Hello, world!").unwrap();
-assert!(signer.verify(&pk, b"Hello, world!", &sig).unwrap());
+// 2. Generate keypair (private key is zeroized on drop)
+let (private_key, public_key) = signer.generate_keys();
+
+// 3. Sign a message
+let message = b"Critical security payload";
+let signature = signer.sign(&private_key, message).unwrap();
+
+// 4. Verify signature
+let is_valid = signer.verify(&public_key, message, &signature).unwrap();
+assert!(is_valid);
 ```
 
-Supported names and aliases:
-
-| Name | Aliases |
-|------|---------|
-| `"rsa"` | — |
-| `"dsa"` | — |
-| `"ecdsa"` | `"p256"` |
-| `"ecdsa-secp256k1"` | `"secp256k1"` |
-| `"eddsa"` | `"ed25519"` |
-| `"ed448"` | `"ed448-goldilocks"` |
-| `"schnorr"` | `"bip340"` |
-| `"mldsa"` | `"ml-dsa"`, `"dilithium"` |
-| `"bls"` | `"bls12-381"` |
-
-List all supported algorithms:
+### 2. JWS Compact Token Serialization (RFC 7515)
 
 ```rust
-Signet::available();
-// -> ["rsa", "dsa", "ecdsa", "ecdsa-secp256k1", "eddsa", "ed448", "schnorr", "mldsa", "bls"]
+use SignetDSA::{Signet, envelope::JwsCompact};
+
+let signer = Signet::from_name("ecdsa-p384").unwrap();
+let (sk, pk) = signer.generate_keys();
+let claims = b"sub=1234567890&admin=true";
+
+// Produce compact JWS string: <header>.<payload>.<signature>
+let token = JwsCompact::sign("ecdsa-p384", &sk, claims).unwrap();
+
+// Verify and decode payload
+let payload = JwsCompact::verify(&token, &pk).unwrap();
+assert_eq!(payload, claims);
 ```
 
-Note: FROST (threshold signing) and BLS aggregation aren't reachable through
-`Signet` — a threshold ceremony and an aggregate-many-signatures workflow
-don't fit the factory's single-key sign/verify shape. Use
-[`crate::algo::frost`] and [`crate::algo::bls::Bls`]'s aggregate functions
-directly.
+### 3. Self-Contained Signed Envelopes
+
+```rust
+use SignetDSA::{Signet, SignetEnvelope};
+
+let signer = Signet::from_name("schnorr").unwrap();
+let (sk, pk) = signer.generate_keys();
+
+// Seal into verifiable JSON envelope
+let envelope = SignetEnvelope::seal(signer.as_ref(), &sk, &pk, b"Transfer $100").unwrap();
+let json_str = envelope.to_json();
+
+// Autonomous verification anywhere
+let parsed = SignetEnvelope::from_json(&json_str).unwrap();
+assert!(parsed.verify().unwrap());
+```
+
+---
+
+## Command-Line Interface (`signetdsa`)
+
+```console
+# List all 11 supported algorithms
+$ cargo run --bin signetdsa -- list
+
+# Key generation, signing, and verification
+$ cargo run --bin signetdsa -- keygen --algo ed25519 --priv-out alice.key --pub-out alice.pub
+$ cargo run --bin signetdsa -- sign --algo ed25519 --key alice.key --message "hello" --sig-out hello.sig
+$ cargo run --bin signetdsa -- verify --algo ed25519 --pubkey alice.pub --message "hello" --sig hello.sig
+VALID
+
+# Run performance benchmark suite
+$ cargo run --release --bin signetdsa -- bench --iterations 50
+
+# Self-contained signed envelopes
+$ cargo run --bin signetdsa -- envelope-sign --algo ed25519 --key alice.key --pubkey alice.pub --message "data" --out env.json
+$ cargo run --bin signetdsa -- envelope-verify --envelope env.json
+VALID ENVELOPE [algo: eddsa, created_at: 1788685354]
+```
+
+---
+
+## Decision Framework: Which Algorithm Should I Choose?
+
+```mermaid
+graph TD
+    Start{What is your primary requirement?}
+    Start -->|Quantum Resistance| MLDSA[ML-DSA Dilithium-65<br/>FIPS 204]
+    Start -->|Fastest & Smallest| ED25519[Ed25519 / EdDSA<br/>RFC 8032]
+    Start -->|Bitcoin / Taproot| BIP340[Schnorr BIP340<br/>secp256k1]
+    Start -->|Ethereum / EVM| SECP[ECDSA secp256k1<br/>with ecrecover]
+    Start -->|Gov / CNSA Suite| P384[ECDSA P-384<br/>~192-bit security]
+    Start -->|Many Signatures in One| BLS[BLS12-381<br/>Aggregatable]
+    Start -->|Multi-Party Multi-Sig| FROST[FROST 2-of-3<br/>Threshold Schnorr]
+    Start -->|Legacy RSA Compliance| RSAPSS[RSA-PSS<br/>RFC 8017]
+```
+
+---
+
+## Frequently Asked Questions (FAQ)
+
+### What is the difference between the typed `Signature` trait and `SignetSigner`?
+`Signature` uses associated types (`PrivateKey`, `PublicKey`, `Error`), providing zero-overhead, compile-time type safety for static usage. However, associated types make a trait object-unsafe in Rust (cannot write `Box<dyn Signature>`). `SignetSigner` unifies all keys into serialized byte representations (`Vec<u8>` and `Zeroizing<Vec<u8>>`), allowing runtime dynamic dispatch (`Box<dyn SignetSigner>`).
+
+### Why choose RSA-PSS over traditional RSA PKCS#1 v1.5?
+RSA PKCS#1 v1.5 padding is deterministic and carries historical vulnerabilities to padding oracle and chosen-ciphertext attacks (e.g. Marvin Attack [RUSTSEC-2023-0071]). RSA-PSS (RSASSA-PSS, RFC 8017 / FIPS 186-5) introduces randomized salt hashing with MGF1, making it provably secure in the Random Oracle Model.
+
+### How does BLS aggregation defend against rogue-key attacks?
+When aggregating signatures, an adversary could submit an artificially crafted public key ($pk' = pk_{victim}^{-1} \cdot pk_{attacker}$) to forge signatures. SignetDSA enforces the standard IRTF CFRG countermeasure requiring distinct messages across signers during aggregate verification (`Bls::verify_aggregated`).
+
+### Is ML-DSA resistant to quantum computers?
+Yes. ML-DSA (CRYSTALS-Dilithium, standardized in NIST FIPS 204) is based on the hardness of the Module Learning With Errors (MLWE) lattice problem, for which no efficient quantum algorithm (including Shor's algorithm) is known.
+
+---
+
+## Interoperability & Official Test Vectors
+
+SignetDSA is validated against official specification test vectors:
+- **Ed25519**: RFC 8032 §7.1 test vectors ([`tests/rfc8032_ed25519.rs`](tests/rfc8032_ed25519.rs)).
+- **Ed448**: RFC 8032 §7.4 test vectors ([`tests/rfc8032_ed448.rs`](tests/rfc8032_ed448.rs)).
+- **Schnorr**: Full Bitcoin BIP340 CSV vectors including malleability test cases ([`tests/bip340_schnorr.rs`](tests/bip340_schnorr.rs)).
+- **ECDSA P-384**: RFC 6979 §A.2.6 deterministic vectors ([`tests/rfc6979_p384.rs`](tests/rfc6979_p384.rs)).
+- **RSA-PSS**: RFC 8017 / PKCS#1 v2.2 test vectors ([`tests/rfc8017_rsa_pss.rs`](tests/rfc8017_rsa_pss.rs)).
+
+---
+
+## License
+
+Licensed under the [MIT License](LICENSE).

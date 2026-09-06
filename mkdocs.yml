@@ -1,9 +1,24 @@
 site_name: "SignetDSA"
-site_description: "A Rust library of digital signature algorithms — classical, threshold, aggregatable, and post-quantum — with a unified factory API."
+site_author: "Minh, Le Duc"
+site_description: "Enterprise-grade digital signature library in Rust — classical (ECDSA, Ed25519, Ed448, RSA-PSS, Schnorr), threshold (FROST), aggregatable (BLS12-381), and post-quantum (ML-DSA FIPS 204) schemes with a unified factory API and JWS token support."
 site_url: "https://minlee0210.github.io/SignetDSA"
 
 repo_url: "https://github.com/MinLee0210/SignetDSA"
 repo_name: "MinLee0210/SignetDSA"
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/MinLee0210/SignetDSA
+  generator: false
+  meta:
+    keywords: "rust cryptography, digital signatures, ecdsa, ed25519, ed448, rsa-pss, bip340 schnorr, frost threshold signature, bls signature aggregation, ml-dsa, crystals-dilithium, post-quantum cryptography, fips 204, jws rfc 7515, rustcrypto"
+    author: "Minh, Le Duc"
+    og:type: "website"
+    og:title: "SignetDSA — Unified Digital Signatures in Rust"
+    og:description: "A Rust library of digital signature algorithms: classical, threshold, aggregatable, and post-quantum (FIPS 204) schemes with a unified factory API and JWS compact tokens."
+    og:url: "https://minlee0210.github.io/SignetDSA"
+    twitter:card: "summary_large_image"
 
 theme:
   name: material
@@ -61,9 +76,11 @@ nav:
     - Choosing an Algorithm: learn/choosing_an_algorithm.md
     - Glossary: learn/glossary.md
   - Algorithms:
-    - RSA: algorithms/rsa.md
+    - RSA (PKCS#1 v1.5): algorithms/rsa.md
+    - RSA-PSS (RFC 8017): algorithms/rsa_pss.md
     - DSA: algorithms/dsa.md
     - ECDSA (NIST P-256): algorithms/ecdsa.md
+    - ECDSA (NIST P-384): algorithms/ecdsa_p384.md
     - ECDSA (secp256k1): algorithms/ecdsa_secp256k1.md
     - EdDSA (Ed25519): algorithms/eddsa.md
     - Ed448: algorithms/ed448.md
@@ -73,6 +90,8 @@ nav:
     - ML-DSA (Post-Quantum): algorithms/mldsa.md
   - Features:
     - Factory API (Signet): features/factory.md
+    - Signed Envelopes & JWS: features/envelope.md
+    - Benchmarking: features/benchmarking.md
     - PEM/DER Import-Export: features/pem.md
     - Batch Verification: features/batch_verification.md
     - Public-Key Recovery: features/recovery.md

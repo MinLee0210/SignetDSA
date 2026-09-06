@@ -1,14 +1,15 @@
 //! `signetdsa` — command-line front end for the [`SignetDSA`] factory API.
 //!
-//! Generates keys, signs messages, and verifies signatures for any algorithm
-//! known to [`Signet::from_name`]. Keys and signatures are stored as
-//! hex-encoded text files so they're easy to inspect, diff, or paste.
+//! Generates keys, signs messages, verifies signatures, recovers public keys,
+//! aggregates BLS signatures, produces self-contained envelopes, and runs benchmarks.
+//! Keys and signatures are stored as hex-encoded text files.
 //!
 //! ```text
 //! signetdsa list
 //! signetdsa keygen --algo ed25519 --priv-out alice.key --pub-out alice.pub
 //! signetdsa sign --algo ed25519 --key alice.key --message "hello" --sig-out hello.sig
 //! signetdsa verify --algo ed25519 --pubkey alice.pub --message "hello" --sig hello.sig
+//! signetdsa bench --iterations 20
 //! ```
 
 use clap::{Parser, Subcommand};
@@ -17,9 +18,16 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use SignetDSA::Signet;
+use SignetDSA::algo::bls::Bls;
+use SignetDSA::algo::ecdsa_secp256k1::EcdsaSecp256k1;
+use SignetDSA::bench::{benchmark_algo, benchmark_all, format_table};
+use SignetDSA::envelope::SignetEnvelope;
 
 #[derive(Parser)]
-#[command(name = "signetdsa", about = "Sign and verify messages with SignetDSA")]
+#[command(
+    name = "signetdsa",
+    about = "Sign, verify, and benchmark digital signatures with SignetDSA"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -75,6 +83,80 @@ enum Command {
         /// Path to a hex-encoded signature.
         #[arg(long)]
         sig: PathBuf,
+    },
+
+    /// Recover an ECDSA secp256k1 public key from a signature and recovery id.
+    Recover {
+        #[arg(long, conflicts_with = "message_file")]
+        message: Option<String>,
+        #[arg(long)]
+        message_file: Option<PathBuf>,
+        /// Path to a hex-encoded signature.
+        #[arg(long)]
+        sig: PathBuf,
+        /// 1-byte recovery ID (0..3).
+        #[arg(long)]
+        recid: u8,
+        /// Optional path to save the recovered public key.
+        #[arg(long)]
+        pub_out: Option<PathBuf>,
+    },
+
+    /// Aggregate multiple BLS signatures into a single compact signature.
+    Aggregate {
+        /// Paths to hex-encoded individual BLS signatures.
+        #[arg(long, num_args = 1..)]
+        sigs: Vec<PathBuf>,
+        /// Where to write the hex-encoded aggregate signature.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+
+    /// Verify an aggregate BLS signature over distinct messages and public keys.
+    VerifyAggregate {
+        /// Path to hex-encoded aggregate signature.
+        #[arg(long)]
+        sig: PathBuf,
+        /// Distinct messages signed by each participant.
+        #[arg(long, num_args = 1..)]
+        messages: Vec<String>,
+        /// Paths to hex-encoded public keys corresponding to each message.
+        #[arg(long, num_args = 1..)]
+        pubkeys: Vec<PathBuf>,
+    },
+
+    /// Create a self-contained signed envelope (JSON).
+    EnvelopeSign {
+        #[arg(long)]
+        algo: String,
+        #[arg(long)]
+        key: PathBuf,
+        #[arg(long)]
+        pubkey: PathBuf,
+        #[arg(long, conflicts_with = "message_file")]
+        message: Option<String>,
+        #[arg(long)]
+        message_file: Option<PathBuf>,
+        /// Output path for the envelope JSON file.
+        #[arg(long)]
+        out: PathBuf,
+    },
+
+    /// Verify a self-contained signed envelope JSON file.
+    EnvelopeVerify {
+        /// Path to the envelope JSON file.
+        #[arg(long)]
+        envelope: PathBuf,
+    },
+
+    /// Benchmark algorithm performance (latency, throughput, key/sig sizes).
+    Bench {
+        /// Optional specific algorithm name (benchmarks all if omitted).
+        #[arg(long)]
+        algo: Option<String>,
+        /// Number of iterations to measure.
+        #[arg(long, default_value_t = 10)]
+        iterations: usize,
     },
 }
 
@@ -169,6 +251,123 @@ fn run() -> Result<(), String> {
                 Ok(false) => Err("INVALID".to_string()),
                 Err(e) => Err(format!("INVALID ({e})")),
             }
+        }
+
+        Command::Recover {
+            message,
+            message_file,
+            sig,
+            recid,
+            pub_out,
+        } => {
+            let message = read_message(message, message_file)?;
+            let signature = read_hex_file(&sig)?;
+            let vk = EcdsaSecp256k1::recover_public_key(&message, &signature, recid)
+                .map_err(|e| format!("recovery failed: {e}"))?;
+            let pk_point = vk.to_encoded_point(true);
+            let pk_bytes = pk_point.as_bytes();
+
+            match pub_out {
+                Some(path) => {
+                    write_hex_file(&path, pk_bytes)?;
+                    println!("Recovered public key written to {}", path.display());
+                }
+                None => println!("Recovered public key: {}", hex::encode(pk_bytes)),
+            }
+            Ok(())
+        }
+
+        Command::Aggregate { sigs, out } => {
+            let mut raw_sigs = Vec::new();
+            for p in &sigs {
+                raw_sigs.push(read_hex_file(p)?);
+            }
+            let agg = Bls::aggregate_signatures(&raw_sigs)
+                .map_err(|e| format!("aggregation failed: {e}"))?;
+
+            match out {
+                Some(path) => {
+                    write_hex_file(&path, &agg)?;
+                    println!("Aggregate signature written to {}", path.display());
+                }
+                None => println!("{}", hex::encode(&agg)),
+            }
+            Ok(())
+        }
+
+        Command::VerifyAggregate {
+            sig,
+            messages,
+            pubkeys,
+        } => {
+            let agg_bytes = read_hex_file(&sig)?;
+            let msg_refs: Vec<&[u8]> = messages.iter().map(|s| s.as_bytes()).collect();
+            let mut pk_bytes_vec = Vec::new();
+            for p in &pubkeys {
+                pk_bytes_vec.push(read_hex_file(p)?);
+            }
+
+            match Bls::verify_aggregated(&agg_bytes, &msg_refs, &pk_bytes_vec) {
+                Ok(true) => {
+                    println!("VALID AGGREGATE SIGNATURE");
+                    Ok(())
+                }
+                _ => Err("INVALID AGGREGATE SIGNATURE".to_string()),
+            }
+        }
+
+        Command::EnvelopeSign {
+            algo,
+            key,
+            pubkey,
+            message,
+            message_file,
+            out,
+        } => {
+            let signer = Signet::from_name(&algo).ok_or_else(|| unknown_algo(&algo))?;
+            let private_key = read_hex_file(&key)?;
+            let public_key = read_hex_file(&pubkey)?;
+            let message = read_message(message, message_file)?;
+
+            let envelope =
+                SignetEnvelope::seal(signer.as_ref(), &private_key, &public_key, &message)?;
+            fs::write(&out, envelope.to_json())
+                .map_err(|e| format!("writing envelope {}: {e}", out.display()))?;
+
+            println!("Signed envelope saved to {}", out.display());
+            Ok(())
+        }
+
+        Command::EnvelopeVerify { envelope } => {
+            let content = fs::read_to_string(&envelope)
+                .map_err(|e| format!("reading {}: {e}", envelope.display()))?;
+            let env = SignetEnvelope::from_json(&content)?;
+            match env.verify() {
+                Ok(true) => {
+                    println!(
+                        "VALID ENVELOPE [algo: {}, created_at: {}]",
+                        env.algo, env.created_at
+                    );
+                    Ok(())
+                }
+                Ok(false) => Err("INVALID ENVELOPE SIGNATURE".to_string()),
+                Err(e) => Err(format!("INVALID ENVELOPE ({e})")),
+            }
+        }
+
+        Command::Bench { algo, iterations } => {
+            match algo {
+                Some(name) => {
+                    let result = benchmark_algo(&name, iterations)?;
+                    println!("{}", format_table(&[result]));
+                }
+                None => {
+                    println!("Benchmarking all algorithms ({iterations} iterations)...");
+                    let results = benchmark_all(iterations);
+                    println!("{}", format_table(&results));
+                }
+            }
+            Ok(())
         }
     }
 }

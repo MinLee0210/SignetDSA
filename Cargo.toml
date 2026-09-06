@@ -29,6 +29,9 @@ pkcs8 = { version = "0.10", features = ["alloc", "pem"] }
 # ECDSA (NIST P-256, pkcs8 for key encoding)
 p256 = { version = "0.13", features = ["ecdsa", "pkcs8", "pem"] }
 
+# ECDSA (NIST P-384 / secp384r1, higher security margin)
+p384 = { version = "0.13", features = ["ecdsa", "pkcs8", "pem"] }
+
 # EdDSA (Ed25519). `batch` enables fast many-signatures-at-once verification;
 # `pem` enables PKCS#8 key import/export.
 ed25519-dalek = { version = "2", features = ["rand_core", "pem", "batch"] }

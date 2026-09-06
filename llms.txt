@@ -1,0 +1,58 @@
+# SignetDSA
+
+> Enterprise-grade digital signature library in Rust — classical (ECDSA, Ed25519, Ed448, RSA-PSS, Schnorr), threshold (FROST), aggregatable (BLS12-381), and post-quantum (ML-DSA FIPS 204) schemes with a unified object-safe factory API, JSON Web Signature (JWS) compact token formatting, and micro-benchmarking.
+
+## Overview & Architecture
+
+SignetDSA provides two complementary APIs:
+1. **Typed Static Trait (`Signature`)**: Zero-cost, compile-time type checked. Static methods `generate_keys()`, `sign(&sk, msg)`, `verify(&pk, msg, sig)` with associated types `type PrivateKey`, `type PublicKey`, `type Error`.
+2. **Dynamic Factory (`Signet` / `SignetSigner`)**: Object-safe runtime factory (inspired by HuggingFace `AutoTokenizer.from_pretrained()`). Allows choosing any algorithm dynamically by string name (`Signet::from_name("ecdsa")`). Private keys are wrapped in `zeroize::Zeroizing` to wipe secret memory upon drop.
+
+## Supported Digital Signature Schemes
+
+- **RSA (PKCS#1 v1.5)**: 2048-bit modulus, SHA-256 (RFC 8017).
+- **RSA-PSS**: RSASSA-PSS randomized padding with MGF1 and SHA-256 (RFC 8017 / FIPS 186-5).
+- **DSA**: 2048-bit discrete log with SHA-256.
+- **ECDSA (NIST P-256)**: 32B private key, 33B compressed public key, 64B signature with SHA-256.
+- **ECDSA (NIST P-384)**: ~192-bit classical security (CNSA Suite 1.0 compliant), 48B private key, 49B public key, 96B signature with SHA-384.
+- **ECDSA (secp256k1)**: Bitcoin/Ethereum curve with `ecrecover`-style public key recovery.
+- **EdDSA (Ed25519)**: Curve25519 fast deterministic signing (RFC 8032) with batch verification.
+- **Ed448**: Curve448 "Goldilocks" (~224-bit security margin, RFC 8032).
+- **Schnorr (BIP340)**: Bitcoin Taproot standard deterministic Schnorr signatures.
+- **FROST**: Flexible Round-Optimized Schnorr Threshold (t-of-n multi-party interactive signing).
+- **BLS (BLS12-381)**: Pairing-based signatures supporting non-interactive aggregation across distinct messages.
+- **ML-DSA (Dilithium-65)**: NIST FIPS 204 Post-Quantum Module-Lattice-based digital signatures.
+
+## High-Level Capabilities
+
+- **Self-Contained Signed Envelopes**: `SignetEnvelope::seal(signer, sk, pk, msg)` produces structured, self-verifying JSON bundles.
+- **JWS Compact Token Serialization**: `JwsCompact::sign(algo, sk, payload)` and `JwsCompact::verify(token, pk)` per RFC 7515 (Base64URL header.payload.signature).
+- **Performance Benchmarking**: `Signet::benchmark_all(iterations)` and `signetdsa bench` CLI command.
+
+## Quick Start Example (Rust)
+
+```rust
+use SignetDSA::{Signet, SignetSigner, JwsCompact};
+
+// Factory instantiation
+let signer = Signet::from_name("eddsa").expect("valid algorithm");
+let (sk, pk) = signer.generate_keys();
+
+// Sign and verify
+let message = b"Hello, SignetDSA!";
+let signature = signer.sign(&sk, message).unwrap();
+assert!(signer.verify(&pk, message, &signature).unwrap());
+
+// JWS Compact Token
+let token = JwsCompact::sign("eddsa", &sk, b"user_id=123").unwrap();
+let payload = JwsCompact::verify(&token, &pk).unwrap();
+assert_eq!(payload, b"user_id=123");
+```
+
+## Documentation Links
+
+- Online Documentation: https://minlee0210.github.io/SignetDSA
+- Choosing an Algorithm Decision Guide: https://minlee0210.github.io/SignetDSA/learn/choosing_an_algorithm/
+- Algorithm Deep Dives: https://minlee0210.github.io/SignetDSA/algorithms/rsa/
+- CLI Reference: https://minlee0210.github.io/SignetDSA/cli/
+- Security & Audits: https://minlee0210.github.io/SignetDSA/security/

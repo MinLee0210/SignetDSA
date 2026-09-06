@@ -8,9 +8,11 @@ code, and caveats.
 
 | Algorithm | Category | Security basis | Private key | Public key | Signature | Deterministic? |
 |---|---|---|---|---|---|---|
-| [RSA](../algorithms/rsa.md) | Classical | Integer factorization | ~1.2 KB (DER) | ~270 B (DER) | 256 B | No (randomized padding) |
+| [RSA (PKCS#1 v1.5)](../algorithms/rsa.md) | Classical | Integer factorization | ~1.2 KB (DER) | ~270 B (DER) | 256 B | No (randomized padding) |
+| [RSA-PSS (RFC 8017)](../algorithms/rsa_pss.md) | Modern Classical | Integer factorization | ~1.2 KB (DER) | ~270 B (DER) | 256 B | No (random salt) |
 | [DSA](../algorithms/dsa.md) | Classical | Discrete log (finite field) | ~440 B (DER) | ~270 B (DER) | ~46–72 B (DER, variable) | No |
 | [ECDSA (P-256)](../algorithms/ecdsa.md) | Classical | Discrete log (NIST curve) | 32 B | 33 B (compressed) | 64 B | No |
+| [ECDSA (P-384)](../algorithms/ecdsa_p384.md) | Classical | Discrete log (NIST curve, ~192-bit CNSA) | 48 B | 49 B (compressed) | 96 B | **Yes** (RFC 6979) |
 | [ECDSA (secp256k1)](../algorithms/ecdsa_secp256k1.md) | Classical | Discrete log (Bitcoin/Ethereum curve) | 32 B | 33 B (compressed) | 64 B | No |
 | [EdDSA (Ed25519)](../algorithms/eddsa.md) | Classical | Discrete log (Curve25519) | 32 B | 32 B | 64 B | **Yes** |
 | [Ed448](../algorithms/ed448.md) | Classical | Discrete log (Curve448) | 57 B | 57 B | 114 B | **Yes** |

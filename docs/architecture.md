@@ -8,11 +8,15 @@ SignetDSA/
 │   ├── lib.rs                     # Crate root, re-exports, top-level docs
 │   ├── signature.rs                # The generic `Signature` trait
 │   ├── signet.rs                   # The object-safe `SignetSigner` trait + `Signet` factory
+│   ├── envelope.rs                 # Self-contained signed envelopes & JWS compact tokens
+│   ├── bench.rs                    # Benchmarking harness
 │   ├── algo/
 │   │   ├── mod.rs
 │   │   ├── rsa.rs                  # RSA (PKCS#1 v1.5 + SHA-256)
+│   │   ├── rsa_pss.rs              # RSA-PSS (RSASSA-PSS + SHA-256)
 │   │   ├── dsa.rs                  # DSA (2048-bit + SHA-256)
 │   │   ├── ecdsa.rs                # ECDSA (NIST P-256)
+│   │   ├── ecdsa_p384.rs           # ECDSA (NIST P-384)
 │   │   ├── ecdsa_secp256k1.rs      # ECDSA (secp256k1) + public-key recovery
 │   │   ├── eddsa.rs                # EdDSA (Ed25519) + batch verification
 │   │   ├── ed448.rs                # Ed448 (Curve448)
@@ -25,6 +29,8 @@ SignetDSA/
 ├── tests/                          # Integration tests: official spec test vectors
 │   ├── rfc8032_ed25519.rs
 │   ├── rfc8032_ed448.rs
+│   ├── rfc6979_p384.rs
+│   ├── rfc8017_rsa_pss.rs
 │   └── bip340_schnorr.rs
 ├── .cargo/
 │   └── audit.toml                  # `cargo audit` advisory allowlist (see Security & Interoperability)
@@ -108,6 +114,7 @@ actually happening.
 | `rsa` | RSA |
 | `dsa` | DSA |
 | `p256` | ECDSA (NIST P-256) |
+| `p384` | ECDSA (NIST P-384) |
 | `k256` | ECDSA (secp256k1) and Schnorr (BIP340), both over secp256k1 |
 | `ed25519-dalek` | EdDSA (Ed25519), including batch verification |
 | `ed448-goldilocks-plus` | Ed448 — the actively maintained fork with EdDSA support; plain `ed448-goldilocks` is curve arithmetic only as of 0.9 |

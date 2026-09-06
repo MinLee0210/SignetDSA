@@ -83,14 +83,61 @@ $ for algo in rsa dsa ecdsa ecdsa-secp256k1 eddsa ed448 schnorr mldsa bls; do
   done
 ```
 
-## What the CLI Doesn't Cover
+### `recover`
 
-The CLI only reaches the ordinary sign/verify shape every algorithm shares
-through `SignetSigner` — it doesn't expose
-[FROST](algorithms/frost.md) ceremonies,
-[BLS aggregation](features/aggregation.md),
-[Ed25519 batch verification](features/batch_verification.md),
-[ECDSA/secp256k1 public-key recovery](features/recovery.md), or
-[PEM import/export](features/pem.md). Those need the typed Rust API
-directly (see each feature's own page) — the CLI is a thin, generic wrapper
-over what the [factory](features/factory.md) covers, nothing more.
+Recover an ECDSA secp256k1 public key from a signature and recovery ID:
+
+```console
+$ cargo run --bin signetdsa -- recover \
+    --message "ecrecover me" \
+    --sig eth.sig \
+    --recid 1 \
+    --pub-out recovered.pub
+Recovered public key written to recovered.pub
+```
+
+### `aggregate` & `verify-aggregate` (BLS)
+
+Combine multiple BLS signatures into an aggregate signature, and verify over distinct messages:
+
+```console
+# Aggregate individual signatures
+$ cargo run --bin signetdsa -- aggregate \
+    --sigs sig1.sig sig2.sig sig3.sig \
+    --out agg.sig
+Aggregate signature written to agg.sig
+
+# Verify aggregate signature over distinct messages and public keys
+$ cargo run --bin signetdsa -- verify-aggregate \
+    --sig agg.sig \
+    --messages "msg1" "msg2" "msg3" \
+    --pubkeys pk1.pub pk2.pub pk3.pub
+VALID AGGREGATE SIGNATURE
+```
+
+### `envelope-sign` & `envelope-verify`
+
+Create and verify self-contained signed envelopes:
+
+```console
+# Seal envelope into JSON
+$ cargo run --bin signetdsa -- envelope-sign \
+    --algo ed25519 \
+    --key alice.key \
+    --pubkey alice.pub \
+    --message "payload" \
+    --out envelope.json
+Signed envelope saved to envelope.json
+
+# Verify envelope autonomously
+$ cargo run --bin signetdsa -- envelope-verify --envelope envelope.json
+VALID ENVELOPE [algo: eddsa, created_at: 1788685354]
+```
+
+### `bench`
+
+Benchmark performance (keygen, sign, verify timings, and key/sig sizes):
+
+```console
+$ cargo run --release --bin signetdsa -- bench --iterations 50
+```

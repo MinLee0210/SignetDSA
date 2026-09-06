@@ -6,25 +6,23 @@
 
 <br>
 
-**SignetDSA** is a Rust library of digital signature algorithms — classical,
-threshold, aggregatable, and post-quantum — behind two APIs: a typed
-`Signature` trait for compile-time-checked usage, and a runtime `Signet`
-factory (inspired by HuggingFace's `AutoTokenizer.from_pretrained()`) for
-selecting an algorithm by name.
+**SignetDSA** is a comprehensive, enterprise-grade Rust library for digital signatures — classical, threshold, aggregatable, and post-quantum — providing two complementary APIs: a typed `Signature` trait for compile-time-checked static usage, and a runtime `Signet` factory (inspired by HuggingFace's `AutoTokenizer.from_pretrained()`) for dynamic algorithm selection.
 
-## Highlights
+## Highlights & Capabilities
 
 | Category | What you get |
 |---|---|
-| **9 factory-selectable algorithms** | RSA, DSA, ECDSA (P-256), ECDSA (secp256k1), EdDSA (Ed25519), Ed448, Schnorr (BIP340), ML-DSA, BLS |
-| **Threshold signing** | FROST — 2-round Schnorr threshold ceremony, exposed directly (not through the factory; see [Choosing an Algorithm](learn/choosing_an_algorithm.md)) |
-| **Aggregation** | BLS aggregate signatures — many signatures collapse into one, verified in a single pairing check |
-| **Public-key recovery** | `ecrecover`-style recovery for ECDSA/secp256k1 |
-| **Batch verification** | Verify many Ed25519 `(message, key, signature)` triples faster than one at a time |
-| **PEM/SPKI import-export** | PKCS#8 PEM for RSA, DSA, ECDSA, and EdDSA keys — interop with OpenSSL-generated files |
-| **Post-quantum** | ML-DSA-65 (CRYSTALS-Dilithium, FIPS 204) |
-| **Spec-verified** | Ed25519, Ed448, and Schnorr are checked against their official RFC 8032 / BIP340 test vectors, not just internal round-trips |
-| **A CLI** | `signetdsa` — generate keys, sign, and verify from the shell, for any registered algorithm |
+| **11 Factory-Selectable Algorithms** | RSA, RSA-PSS, DSA, ECDSA (NIST P-256 & P-384), ECDSA (secp256k1), EdDSA (Ed25519), Ed448, Schnorr (BIP340), ML-DSA-65, BLS12-381 |
+| **Signed Envelopes & JWS** | Self-verifying JSON message containers (`SignetEnvelope`) and RFC 7515 URL-safe compact tokens (`JwsCompact`) |
+| **Performance Benchmarking** | Built-in micro-benchmarking harness (`Signet::benchmark_all` and `signetdsa bench`) |
+| **Threshold Signing** | FROST — 2-round interactive Schnorr threshold ceremony on secp256k1 (`SignetDSA::algo::frost`) |
+| **Signature Aggregation** | BLS aggregate signatures — condense many signatures into one, verified via a single pairing equation |
+| **Public-Key Recovery** | `ecrecover`-style recovery for ECDSA/secp256k1 (`EcdsaSecp256k1::recover_public_key`) |
+| **Batch Verification** | Verify many Ed25519 `(message, key, signature)` triples simultaneously for accelerated throughput |
+| **PEM/SPKI Import-Export** | PKCS#8 PEM encoding for RSA, RSA-PSS, DSA, ECDSA (P-256/P-384), and Ed25519 |
+| **Post-Quantum Security** | ML-DSA-65 (CRYSTALS-Dilithium, NIST FIPS 204) lattice-based digital signatures |
+| **Specification Verified** | Tested against official RFC 8032 (Ed25519/Ed448), BIP340 (Schnorr), RFC 6979 (P-384), and RFC 8017 (RSA-PSS) vectors |
+| **Command-Line Tool** | `signetdsa` — generate keys, sign, verify, recover, aggregate, and benchmark directly from the shell |
 
 ## Quick Start
 
@@ -32,6 +30,34 @@ selecting an algorithm by name.
 [dependencies]
 SignetDSA = { git = "https://github.com/MinLee0210/SignetDSA" }
 ```
+
+=== "Factory API"
+
+    ```rust
+    use SignetDSA::{Signet, SignetSigner};
+
+    // Dynamically select algorithm by name
+    let signer = Signet::from_name("eddsa").expect("Unknown algorithm");
+    let (sk, pk) = signer.generate_keys();
+    let message = b"Hello, SignetDSA!";
+
+    let signature = signer.sign(&sk, message).unwrap();
+    assert!(signer.verify(&pk, message, &signature).unwrap());
+    ```
+
+=== "JWS Compact Tokens (RFC 7515)"
+
+    ```rust
+    use SignetDSA::{Signet, envelope::JwsCompact};
+
+    let signer = Signet::from_name("ecdsa-p384").unwrap();
+    let (sk, pk) = signer.generate_keys();
+
+    // Sign payload into URL-safe compact token: header.payload.signature
+    let token = JwsCompact::sign("ecdsa-p384", &sk, b"sub=user123").unwrap();
+    let payload = JwsCompact::verify(&token, &pk).unwrap();
+    assert_eq!(payload, b"sub=user123");
+    ```
 
 === "Typed API"
 
@@ -42,17 +68,6 @@ SignetDSA = { git = "https://github.com/MinLee0210/SignetDSA" }
     let (sk, pk) = Ecdsa::generate_keys();
     let sig = Ecdsa::sign(&sk, b"Hello, world!").unwrap();
     assert!(Ecdsa::verify(&pk, b"Hello, world!", &sig).unwrap());
-    ```
-
-=== "Factory API"
-
-    ```rust
-    use SignetDSA::{Signet, SignetSigner};
-
-    let signer = Signet::from_name("ecdsa").expect("Unknown algorithm");
-    let (sk, pk) = signer.generate_keys();
-    let sig = signer.sign(&sk, b"Hello, world!").unwrap();
-    assert!(signer.verify(&pk, b"Hello, world!", &sig).unwrap());
     ```
 
 === "CLI"
@@ -67,9 +82,9 @@ SignetDSA = { git = "https://github.com/MinLee0210/SignetDSA" }
 ## Navigation
 
 - **[Getting Started](getting_started.md)** — installation, both APIs, first signature
-- **[Learn](learn/intuition.md)** — what a digital signature actually is, a decision guide across all nine algorithms, and a glossary
-- **[Algorithms](algorithms/rsa.md)** — one deep-dive page per algorithm: theory, code, caveats
-- **[Features](features/factory.md)** — the factory API, PEM, batch verification, recovery, aggregation
-- **[CLI](cli.md)** — the `signetdsa` command-line tool
+- **[Learn](learn/intuition.md)** — what a digital signature actually is, a decision guide across all 11 algorithms, and a glossary
+- **[Algorithms](algorithms/rsa.md)** — deep-dive pages for every scheme: theory, code, parameters, security analysis
+- **[Features](features/factory.md)** — factory API, signed envelopes, benchmarking, PEM, batch verification, recovery, aggregation
+- **[CLI Reference](cli.md)** — the `signetdsa` command-line utility
 - **[Security & Interoperability](security.md)** — known limitations, RUSTSEC advisories, spec test vectors
-- **[Design & Architecture](architecture.md)** — project layout and extensibility
+- **[Design & Architecture](architecture.md)** — design philosophy, project layout, and extensibility

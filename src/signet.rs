@@ -73,13 +73,17 @@ impl Signet {
     /// - `"schnorr"` or `"bip340"`
     /// - `"mldsa"`, `"ml-dsa"`, or `"dilithium"`
     /// - `"bls"` or `"bls12-381"`
+    /// - `"rsa-pss"`, `"pss"`, or `"rsassa-pss"`
+    /// - `"ecdsa-p384"`, `"p384"`, or `"secp384r1"`
     ///
     /// Returns `None` if the name is not recognised.
     pub fn from_name(name: &str) -> Option<Box<dyn SignetSigner>> {
         match name.to_lowercase().as_str() {
             "rsa" => Some(Box::new(adapters::RsaAdapter)),
+            "rsa-pss" | "pss" | "rsassa-pss" => Some(Box::new(adapters::RsaPssAdapter)),
             "dsa" => Some(Box::new(adapters::DsaAdapter)),
             "ecdsa" | "p256" => Some(Box::new(adapters::EcdsaAdapter)),
+            "ecdsa-p384" | "p384" | "secp384r1" => Some(Box::new(adapters::EcdsaP384Adapter)),
             "ecdsa-secp256k1" | "secp256k1" => Some(Box::new(adapters::EcdsaSecp256k1Adapter)),
             "eddsa" | "ed25519" => Some(Box::new(adapters::EdDsaAdapter)),
             "ed448" | "ed448-goldilocks" => Some(Box::new(adapters::Ed448Adapter)),
@@ -94,8 +98,10 @@ impl Signet {
     pub fn available() -> &'static [&'static str] {
         &[
             "rsa",
+            "rsa-pss",
             "dsa",
             "ecdsa",
+            "ecdsa-p384",
             "ecdsa-secp256k1",
             "eddsa",
             "ed448",
@@ -577,6 +583,119 @@ mod adapters {
             }
         }
     }
+    // -------------------------------------------------------------------------
+    // RSA-PSS  — keys serialized as PKCS#1 DER
+    // -------------------------------------------------------------------------
+    pub struct RsaPssAdapter;
+
+    impl SignetSigner for RsaPssAdapter {
+        fn name(&self) -> &'static str {
+            "rsa-pss"
+        }
+
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
+            use rsa::pkcs1::{EncodeRsaPrivateKey, EncodeRsaPublicKey};
+            use rsa::{RsaPrivateKey, RsaPublicKey};
+
+            let sk = RsaPrivateKey::new(&mut OsRng, 2048).expect("RSA-PSS keygen failed");
+            let pk = RsaPublicKey::from(&sk);
+            (
+                Zeroizing::new(
+                    sk.to_pkcs1_der()
+                        .expect("RSA-PSS sk encode")
+                        .as_bytes()
+                        .to_vec(),
+                ),
+                pk.to_pkcs1_der()
+                    .expect("RSA-PSS pk encode")
+                    .as_bytes()
+                    .to_vec(),
+            )
+        }
+
+        fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
+            use ::signature::{RandomizedSigner, SignatureEncoding};
+            use rsa::{RsaPrivateKey, pkcs1::DecodeRsaPrivateKey, pss::BlindedSigningKey};
+            use sha2::Sha256;
+
+            let sk = RsaPrivateKey::from_pkcs1_der(private_key).map_err(|e| e.to_string())?;
+            let signing_key = BlindedSigningKey::<Sha256>::new(sk);
+            Ok(signing_key
+                .sign_with_rng(&mut OsRng, message)
+                .to_bytes()
+                .to_vec())
+        }
+
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use ::signature::Verifier;
+            use rsa::{
+                RsaPublicKey,
+                pkcs1::DecodeRsaPublicKey,
+                pss::{Signature as PssSignature, VerifyingKey},
+            };
+            use sha2::Sha256;
+
+            let pk = RsaPublicKey::from_pkcs1_der(public_key).map_err(|e| e.to_string())?;
+            let vk = VerifyingKey::<Sha256>::new(pk);
+            let sig = PssSignature::try_from(signature).map_err(|e| e.to_string())?;
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // ECDSA P-384  — private: 48-byte scalar, public: 49-byte SEC1 compressed
+    // -------------------------------------------------------------------------
+    pub struct EcdsaP384Adapter;
+
+    impl SignetSigner for EcdsaP384Adapter {
+        fn name(&self) -> &'static str {
+            "ecdsa-p384"
+        }
+
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
+            use p384::ecdsa::SigningKey;
+
+            let sk = SigningKey::random(&mut OsRng);
+            let pk_point = sk.verifying_key().to_encoded_point(true);
+            (
+                Zeroizing::new(sk.to_bytes().to_vec()),
+                pk_point.as_bytes().to_vec(),
+            )
+        }
+
+        fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
+            use p384::ecdsa::{Signature, SigningKey, signature::Signer};
+
+            let sk = SigningKey::from_bytes(private_key.into()).map_err(|e| e.to_string())?;
+            let sig: Signature = sk.sign(message);
+            Ok(sig.to_bytes().to_vec())
+        }
+
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use p384::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+            use p384::elliptic_curve::sec1::EncodedPoint;
+
+            let point = EncodedPoint::<p384::NistP384>::from_bytes(public_key)
+                .map_err(|e| e.to_string())?;
+            let vk = VerifyingKey::from_encoded_point(&point).map_err(|e| e.to_string())?;
+            let sig = Signature::try_from(signature).map_err(|e| e.to_string())?;
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -602,6 +721,10 @@ mod tests {
     #[test]
     fn from_name_aliases_work() {
         assert_eq!(Signet::from_name("p256").unwrap().name(), "ecdsa");
+        assert_eq!(Signet::from_name("p384").unwrap().name(), "ecdsa-p384");
+        assert_eq!(Signet::from_name("secp384r1").unwrap().name(), "ecdsa-p384");
+        assert_eq!(Signet::from_name("pss").unwrap().name(), "rsa-pss");
+        assert_eq!(Signet::from_name("rsassa-pss").unwrap().name(), "rsa-pss");
         assert_eq!(Signet::from_name("ed25519").unwrap().name(), "eddsa");
         assert_eq!(Signet::from_name("bip340").unwrap().name(), "schnorr");
         assert_eq!(Signet::from_name("dilithium").unwrap().name(), "mldsa");

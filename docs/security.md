@@ -50,6 +50,8 @@ implements the actual standard:
 | [Ed25519](algorithms/eddsa.md) | [`tests/rfc8032_ed25519.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/rfc8032_ed25519.rs) | RFC 8032 §7.1 |
 | [Ed448](algorithms/ed448.md) | [`tests/rfc8032_ed448.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/rfc8032_ed448.rs) | RFC 8032 §7.4 |
 | [Schnorr (BIP340)](algorithms/schnorr.md) | [`tests/bip340_schnorr.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/bip340_schnorr.rs) | [Official BIP340 CSV](https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv), all 19 vectors including invalid-signature edge cases |
+| [ECDSA (P-384)](algorithms/ecdsa_p384.md) | [`tests/rfc6979_p384.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/rfc6979_p384.rs) | RFC 6979 §A.2.6 deterministic ECDSA vectors |
+| [RSA-PSS](algorithms/rsa_pss.md) | [`tests/rfc8017_rsa_pss.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/rfc8017_rsa_pss.rs) | RFC 8017 PKCS#1 v2.2 RSASSA-PSS verification |
 
 ### The Bug These Vectors Caught
 
