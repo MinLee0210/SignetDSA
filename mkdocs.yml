@@ -1,0 +1,77 @@
+site_name: "SignetDSA"
+site_description: "A Rust library of digital signature algorithms — classical, threshold, aggregatable, and post-quantum — with a unified factory API."
+site_url: "https://minlee0210.github.io/LightDSA"
+
+repo_url: "https://github.com/MinLee0210/LightDSA"
+repo_name: "MinLee0210/LightDSA"
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started: getting_started.md
+  - Choosing an Algorithm: choosing_an_algorithm.md
+  - Algorithms:
+    - RSA: algorithms/rsa.md
+    - DSA: algorithms/dsa.md
+    - ECDSA (NIST P-256): algorithms/ecdsa.md
+    - ECDSA (secp256k1): algorithms/ecdsa_secp256k1.md
+    - EdDSA (Ed25519): algorithms/eddsa.md
+    - Ed448: algorithms/ed448.md
+    - Schnorr (BIP340): algorithms/schnorr.md
+    - FROST (Threshold): algorithms/frost.md
+    - BLS (Aggregatable): algorithms/bls.md
+    - ML-DSA (Post-Quantum): algorithms/mldsa.md
+  - Features:
+    - Factory API (Signet): features/factory.md
+    - PEM/DER Import-Export: features/pem.md
+    - Batch Verification: features/batch_verification.md
+    - Public-Key Recovery: features/recovery.md
+    - BLS Aggregation: features/aggregation.md
+  - CLI: cli.md
+  - Security & Interoperability: security.md
+  - Design & Architecture: architecture.md

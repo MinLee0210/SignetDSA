@@ -3,6 +3,17 @@
 A Rust library implementing digital signature algorithms — classical, threshold,
 and post-quantum — backed by the RustCrypto ecosystem crates.
 
+## Documentation
+
+Full docs (per-algorithm deep dives, feature guides, CLI reference, security
+notes, architecture) live under [`docs/`](docs/), built with
+[MkDocs](https://www.mkdocs.org/) + [Material](https://squidfunk.github.io/mkdocs-material/):
+
+```bash
+pip install mkdocs-material
+mkdocs serve   # http://127.0.0.1:8000
+```
+
 ## Algorithms
 
 | Algorithm | Category | Key Scheme | Crate |
