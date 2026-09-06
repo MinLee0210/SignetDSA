@@ -6,7 +6,7 @@
 use crate::signature::Signature;
 use k256::schnorr::{
     Signature as SchnorrSignature, SigningKey, VerifyingKey,
-    signature::{Signer, Verifier},
+    signature::hazmat::{PrehashSigner, PrehashVerifier},
 };
 use rand::rngs::OsRng;
 
@@ -15,10 +15,21 @@ use rand::rngs::OsRng;
 /// BIP340 Schnorr is deterministic — signing the same message with
 /// the same key always produces the same signature. This is a stronger
 /// security property than ECDSA, which requires a fresh random nonce per sign.
+///
+/// # BIP340 conformance
+///
+/// Signing and verification go through k256's `PrehashSigner`/`PrehashVerifier`
+/// (`sign_prehash`/`verify_prehash`), which — despite the name — feed `message`
+/// directly into the tagged challenge hash exactly as BIP340 specifies, with a
+/// fixed (all-zero) `aux_rand` for determinism. k256's `Signer`/`Verifier`
+/// traits instead SHA-256-hash the message first, which is *not* BIP340 and
+/// would not interoperate with real Taproot signatures over the same message
+/// — that pair is deliberately avoided here.
 pub struct Schnorr;
 
 #[derive(Debug)]
 pub enum SchnorrError {
+    Signing(k256::schnorr::signature::Error),
     InvalidSignatureEncoding,
     Verification(k256::schnorr::signature::Error),
 }
@@ -26,6 +37,7 @@ pub enum SchnorrError {
 impl std::fmt::Display for SchnorrError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            SchnorrError::Signing(e) => write!(f, "Schnorr signing failed: {e}"),
             SchnorrError::InvalidSignatureEncoding => {
                 write!(f, "Invalid Schnorr signature encoding")
             }
@@ -48,7 +60,9 @@ impl Signature for Schnorr {
     }
 
     fn sign(private_key: &Self::PrivateKey, message: &[u8]) -> Result<Vec<u8>, Self::Error> {
-        let sig: SchnorrSignature = private_key.sign(message);
+        let sig: SchnorrSignature = private_key
+            .sign_prehash(message)
+            .map_err(SchnorrError::Signing)?;
         Ok(sig.to_bytes().to_vec())
     }
 
@@ -60,7 +74,7 @@ impl Signature for Schnorr {
         let sig = SchnorrSignature::try_from(signature)
             .map_err(|_| SchnorrError::InvalidSignatureEncoding)?;
         public_key
-            .verify(message, &sig)
+            .verify_prehash(message, &sig)
             .map(|_| true)
             .map_err(SchnorrError::Verification)
     }

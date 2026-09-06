@@ -9,8 +9,12 @@
 //!
 //! ## Features
 //!
-//! * **Classical Algorithms:** RSA, DSA, ECDSA (NIST P-256), EdDSA (Ed25519), Schnorr (BIP340).
+//! * **Classical Algorithms:** RSA, DSA, ECDSA (NIST P-256), ECDSA/secp256k1
+//!   (with `ecrecover`-style public-key recovery), EdDSA (Ed25519), Ed448,
+//!   Schnorr (BIP340).
 //! * **Threshold Signatures:** FROST (Schnorr 2-of-3 threshold signatures).
+//! * **Aggregatable Signatures:** BLS (BLS12-381) — many signatures collapse
+//!   into one.
 //! * **Post-Quantum:** ML-DSA (CRYSTALS-Dilithium, FIPS 204).
 //!
 //! ## Quick Start

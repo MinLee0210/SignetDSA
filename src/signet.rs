@@ -67,9 +67,12 @@ impl Signet {
     ///
     /// Names are **case-insensitive**. Aliases are accepted:
     /// - `"ecdsa"` or `"p256"`
+    /// - `"ecdsa-secp256k1"` or `"secp256k1"`
     /// - `"eddsa"` or `"ed25519"`
+    /// - `"ed448"` or `"ed448-goldilocks"`
     /// - `"schnorr"` or `"bip340"`
     /// - `"mldsa"`, `"ml-dsa"`, or `"dilithium"`
+    /// - `"bls"` or `"bls12-381"`
     ///
     /// Returns `None` if the name is not recognised.
     pub fn from_name(name: &str) -> Option<Box<dyn SignetSigner>> {
@@ -77,16 +80,29 @@ impl Signet {
             "rsa" => Some(Box::new(adapters::RsaAdapter)),
             "dsa" => Some(Box::new(adapters::DsaAdapter)),
             "ecdsa" | "p256" => Some(Box::new(adapters::EcdsaAdapter)),
+            "ecdsa-secp256k1" | "secp256k1" => Some(Box::new(adapters::EcdsaSecp256k1Adapter)),
             "eddsa" | "ed25519" => Some(Box::new(adapters::EdDsaAdapter)),
+            "ed448" | "ed448-goldilocks" => Some(Box::new(adapters::Ed448Adapter)),
             "schnorr" | "bip340" => Some(Box::new(adapters::SchnorrAdapter)),
             "mldsa" | "ml-dsa" | "dilithium" => Some(Box::new(adapters::MlDsaAdapter)),
+            "bls" | "bls12-381" => Some(Box::new(adapters::BlsAdapter)),
             _ => None,
         }
     }
 
     /// All canonical algorithm names supported by [`Signet::from_name`].
     pub fn available() -> &'static [&'static str] {
-        &["rsa", "dsa", "ecdsa", "eddsa", "schnorr", "mldsa"]
+        &[
+            "rsa",
+            "dsa",
+            "ecdsa",
+            "ecdsa-secp256k1",
+            "eddsa",
+            "ed448",
+            "schnorr",
+            "mldsa",
+            "bls",
+        ]
     }
 }
 
@@ -341,10 +357,10 @@ mod adapters {
         }
 
         fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
-            use k256::schnorr::{Signature, SigningKey, signature::Signer};
+            use k256::schnorr::{Signature, SigningKey, signature::hazmat::PrehashSigner};
 
             let sk = SigningKey::from_bytes(private_key).map_err(|e| e.to_string())?;
-            let sig: Signature = sk.sign(message);
+            let sig: Signature = sk.sign_prehash(message).map_err(|e| e.to_string())?;
             Ok(sig.to_bytes().to_vec())
         }
 
@@ -354,12 +370,12 @@ mod adapters {
             message: &[u8],
             signature: &[u8],
         ) -> Result<bool, String> {
-            use k256::schnorr::{Signature, VerifyingKey, signature::Verifier};
+            use k256::schnorr::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
 
             let vk = VerifyingKey::from_bytes(public_key).map_err(|e| e.to_string())?;
             let sig = Signature::try_from(signature)
                 .map_err(|_| "Invalid Schnorr signature bytes".to_string())?;
-            vk.verify(message, &sig)
+            vk.verify_prehash(message, &sig)
                 .map(|_| true)
                 .map_err(|e| e.to_string())
         }
@@ -412,6 +428,153 @@ mod adapters {
             vk.verify(message, &sig)
                 .map(|_| true)
                 .map_err(|e: ml_dsa::Error| e.to_string())
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // ECDSA secp256k1 (Bitcoin/Ethereum curve)  — private: 32-byte scalar,
+    // public: 33-byte SEC1 compressed
+    // -------------------------------------------------------------------------
+    pub struct EcdsaSecp256k1Adapter;
+
+    impl SignetSigner for EcdsaSecp256k1Adapter {
+        fn name(&self) -> &'static str {
+            "ecdsa-secp256k1"
+        }
+
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
+            use k256::ecdsa::SigningKey;
+
+            let sk = SigningKey::random(&mut OsRng);
+            let pk_point = sk.verifying_key().to_encoded_point(true);
+            (
+                Zeroizing::new(sk.to_bytes().to_vec()),
+                pk_point.as_bytes().to_vec(),
+            )
+        }
+
+        fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
+            use k256::ecdsa::{Signature, SigningKey, signature::Signer};
+
+            let sk = SigningKey::from_bytes(private_key.into()).map_err(|e| e.to_string())?;
+            let sig: Signature = sk.sign(message);
+            Ok(sig.to_bytes().to_vec())
+        }
+
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use k256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+            use k256::elliptic_curve::sec1::EncodedPoint;
+
+            let point = EncodedPoint::<k256::Secp256k1>::from_bytes(public_key)
+                .map_err(|e| e.to_string())?;
+            let vk = VerifyingKey::from_encoded_point(&point).map_err(|e| e.to_string())?;
+            let sig = Signature::try_from(signature).map_err(|e| e.to_string())?;
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Ed448 (Goldilocks)  — private: 57-byte seed, public: 57-byte point
+    // -------------------------------------------------------------------------
+    pub struct Ed448Adapter;
+
+    impl SignetSigner for Ed448Adapter {
+        fn name(&self) -> &'static str {
+            "ed448"
+        }
+
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
+            use ed448_goldilocks_plus::{SECRET_KEY_LENGTH, SecretKey, SigningKey};
+            use rand::RngCore;
+
+            let mut seed = [0u8; SECRET_KEY_LENGTH];
+            OsRng.fill_bytes(&mut seed);
+            let secret_key: SecretKey = seed.into();
+
+            let sk = SigningKey::from_bytes(&secret_key);
+            let vk = sk.verifying_key();
+            (
+                Zeroizing::new(sk.to_bytes().to_vec()),
+                vk.to_bytes().to_vec(),
+            )
+        }
+
+        fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
+            use ed448_goldilocks_plus::{SecretKey, SigningKey};
+
+            let secret_key = SecretKey::try_from(private_key)
+                .map_err(|_| "Ed448 private key must be 57 bytes".to_string())?;
+            let sk = SigningKey::from_bytes(&secret_key);
+            Ok(sk.sign_raw(message).to_bytes().to_vec())
+        }
+
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use ed448_goldilocks_plus::{Signature, VerifyingKey};
+
+            let pk_bytes: [u8; 57] = public_key
+                .try_into()
+                .map_err(|_| "Ed448 public key must be 57 bytes".to_string())?;
+            let vk = VerifyingKey::from_bytes(&pk_bytes).map_err(|e| e.to_string())?;
+            let sig = Signature::from_slice(signature).map_err(|e| e.to_string())?;
+            vk.verify_raw(&sig, message)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // BLS12-381  — keys via crate-native encoding (no aggregation support at
+    // this factory layer; use crate::algo::bls::Bls directly for that)
+    // -------------------------------------------------------------------------
+    pub struct BlsAdapter;
+
+    impl SignetSigner for BlsAdapter {
+        fn name(&self) -> &'static str {
+            "bls"
+        }
+
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
+            use bls_signatures::{PrivateKey, Serialize};
+
+            let sk = PrivateKey::generate(&mut OsRng);
+            let pk = sk.public_key();
+            (Zeroizing::new(sk.as_bytes()), pk.as_bytes())
+        }
+
+        fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
+            use bls_signatures::{PrivateKey, Serialize};
+
+            let sk = PrivateKey::from_bytes(private_key).map_err(|e| e.to_string())?;
+            Ok(sk.sign(message).as_bytes())
+        }
+
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use bls_signatures::{PublicKey, Serialize, Signature};
+
+            let pk = PublicKey::from_bytes(public_key).map_err(|e| e.to_string())?;
+            let sig = Signature::from_bytes(signature).map_err(|e| e.to_string())?;
+            if pk.verify(sig, message) {
+                Ok(true)
+            } else {
+                Err("BLS verification failed".to_string())
+            }
         }
     }
 }

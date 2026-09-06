@@ -2,10 +2,10 @@
 name = "SignetDSA"
 version = "0.1.0"
 edition = "2024"
-description = "A Rust library of digital signature algorithms — classical, threshold, and post-quantum — with a unified factory API."
+description = "A Rust library of digital signature algorithms — classical, threshold, aggregatable, and post-quantum — with a unified factory API."
 authors = ["Minh, Le Duc"]
 license = "MIT"
-keywords = ["cryptography", "signature", "dsa", "ecdsa", "post-quantum"]
+keywords = ["cryptography", "signature", "ecdsa", "bls", "post-quantum"]
 categories = ["cryptography"]
 repository = "https://github.com/MinLee0210/LightDSA"
 homepage = "https://github.com/MinLee0210/LightDSA"
@@ -15,22 +15,38 @@ rust-version = "1.85"
 
 [dependencies]
 # RSA
-rsa = { version = "0.9", features = ["sha2"] }
+rsa = { version = "0.9", features = ["sha2", "pem"] }
 
 # DSA
 dsa = "0.6"
 
+# Forces `pem` on for the `pkcs8` crate that `dsa` re-exports (dsa itself has
+# no feature flag for this — see src/algo/dsa.rs's PEM helpers). Cargo
+# feature unification means this also lights up `pem` for every other user
+# of the same pkcs8 0.10.x in the graph.
+pkcs8 = { version = "0.10", features = ["alloc", "pem"] }
+
 # ECDSA (NIST P-256, pkcs8 for key encoding)
-p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8", "pem"] }
 
-# EdDSA (Ed25519)
-ed25519-dalek = { version = "2", features = ["rand_core"] }
+# EdDSA (Ed25519). `batch` enables fast many-signatures-at-once verification;
+# `pem` enables PKCS#8 key import/export.
+ed25519-dalek = { version = "2", features = ["rand_core", "pem", "batch"] }
 
-# Schnorr (BIP340, secp256k1)
-k256 = { version = "0.13", features = ["schnorr"] }
+# Ed448 ("Goldilocks"). Plain `ed448-goldilocks` (no "-plus") is curve
+# arithmetic only as of 0.9 — no EdDSA sign/verify — hence this fork.
+ed448-goldilocks-plus = "0.18.1"
+
+# ECDSA/secp256k1 (Bitcoin/Ethereum curve, with public-key recovery) and
+# Schnorr (BIP340), both over secp256k1.
+k256 = { version = "0.13", features = ["ecdsa", "schnorr"] }
 
 # FROST threshold Schnorr (2-of-3)
 frost-secp256k1 = "2"
+
+# BLS over BLS12-381 (aggregatable signatures). Pure-Rust `pairing`/`bls12_381`
+# backend, not `blst`, to avoid a C build dependency.
+bls-signatures = "0.15.0"
 
 # ML-DSA (CRYSTALS-Dilithium, FIPS 204 post-quantum)
 # NOTE: must stay >=0.1.0-rc.3 — earlier versions carry RUSTSEC-2025-0144,
@@ -48,3 +64,7 @@ signature = "2"
 
 # Zeroize secret key bytes on drop
 zeroize = "1.8"
+
+# `signetdsa` CLI binary (src/bin/signetdsa.rs)
+clap = { version = "4.6.6", features = ["derive"] }
+hex = "0.4.3"

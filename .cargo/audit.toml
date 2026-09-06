@@ -1,0 +1,11 @@
+# cargo-audit configuration.
+#
+# RUSTSEC-2023-0071 ("Marvin Attack" timing side-channel in RSA signing) has
+# no fixed upgrade available. It's a known, accepted limitation documented in
+# README.md's "Known limitations" section — RSA is offered for interop with
+# systems that require it, with guidance to prefer ECDSA/EdDSA/Schnorr where
+# an attacker could plausibly measure signing latency. Silencing it here (not
+# in CI flags) keeps the ignore reasoning next to the audit database instead
+# of buried in a workflow file.
+[advisories]
+ignore = ["RUSTSEC-2023-0071"]
