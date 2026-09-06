@@ -10,19 +10,13 @@ on:
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
+# mkdocs gh-deploy pushes the built site straight to the gh-pages branch,
+# so the token needs write access to the repo itself.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Only one Pages deployment at a time; let an in-flight run finish rather
-# than cancel it mid-upload.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  contents: write
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,21 +30,14 @@ jobs:
       - name: Install MkDocs Material
         run: pip install -r requirements-docs.txt
 
-      - name: Build site
-        run: mkdocs build --strict
+      - name: Configure git identity for the gh-pages commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      # Builds with --strict (fails on broken links/nav before anything is
+      # pushed) then force-pushes the result to gh-pages via ghp-import.
+      # The force-push is expected and harmless here: gh-pages holds only
+      # generated output, never hand-written history worth preserving.
+      - name: Build and deploy to gh-pages
+        run: mkdocs gh-deploy --force --strict

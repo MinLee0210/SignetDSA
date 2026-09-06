@@ -20,11 +20,6 @@ pip install -r requirements-docs.txt
 mkdocs serve   # http://127.0.0.1:8000
 ```
 
-The Pages site itself needs a one-time setup step in the repo: **Settings →
-Pages → Build and deployment → Source → "GitHub Actions"**. Until that's
-set, the workflow will build successfully but the deploy step will fail
-with a permissions/environment error.
-
 ## Algorithms
 
 | Algorithm | Category | Key Scheme | Crate |
