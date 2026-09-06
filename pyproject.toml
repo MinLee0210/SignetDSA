@@ -1,0 +1,49 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "signetdsa"
+version = "0.1.0"
+description = "Python bindings for SignetDSA digital signature library (classical, threshold, aggregatable, and post-quantum algorithms with unified factory API)"
+authors = [{ name = "Minh, Le Duc" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = [
+    "cryptography",
+    "signature",
+    "ecdsa",
+    "ed25519",
+    "ed448",
+    "schnorr",
+    "bls",
+    "frost",
+    "post-quantum",
+    "mldsa",
+    "dilithium",
+    "jws",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+]
+
+[tool.maturin]
+features = ["python"]
+module-name = "signetdsa._signetdsa"
+python-source = "python"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+python_files = ["test_*.py", "*_test.py"]
+

@@ -7,10 +7,11 @@
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Post-Quantum Ready](https://img.shields.io/badge/Post--Quantum-FIPS%20204%20(ML--DSA)-green.svg)](https://csrc.nist.gov/pubs/fips/204/final)
+[![Python Bindings](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://minlee0210.github.io/SignetDSA/python/)
 
-**Enterprise-grade digital signature library in Rust — classical, threshold, aggregatable, and post-quantum schemes with a unified factory API and JWS token support.**
+**Enterprise-grade digital signature library in Rust and Python — classical, threshold, aggregatable, and post-quantum schemes with a unified factory API and JWS token support.**
 
-[Documentation](https://minlee0210.github.io/SignetDSA) • [Algorithm Selection Guide](https://minlee0210.github.io/SignetDSA/learn/choosing_an_algorithm/) • [CLI Reference](https://minlee0210.github.io/SignetDSA/cli/) • [Benchmarks](https://minlee0210.github.io/SignetDSA/features/benchmarking/)
+[Documentation](https://minlee0210.github.io/SignetDSA) • [Python SDK](https://minlee0210.github.io/SignetDSA/python/) • [Algorithm Selection Guide](https://minlee0210.github.io/SignetDSA/learn/choosing_an_algorithm/) • [CLI Reference](https://minlee0210.github.io/SignetDSA/cli/) • [Benchmarks](https://minlee0210.github.io/SignetDSA/features/benchmarking/)
 
 </div>
 
@@ -120,6 +121,30 @@ let json_str = envelope.to_json();
 let parsed = SignetEnvelope::from_json(&json_str).unwrap();
 assert!(parsed.verify().unwrap());
 ```
+
+### 4. Python SDK (`signetdsa`)
+
+```python
+import signetdsa
+
+# Runtime dynamic algorithm selection
+signer = signetdsa.Signet.from_name("eddsa")
+sk, pk = signer.generate_keys()
+
+# Signing and verification
+signature = signer.sign(sk, b"Signed payload")
+assert signer.verify(pk, b"Signed payload", signature) is True
+
+# JWS Compact tokens (RFC 7515)
+token = signetdsa.JwsCompact.sign("eddsa", sk, b"claims_data")
+assert signetdsa.JwsCompact.verify(token, pk) == b"claims_data"
+
+# Self-contained signed envelopes
+envelope = signetdsa.SignetEnvelope.seal(signer, sk, pk, b"Payment payload")
+assert envelope.verify() is True
+```
+
+See [Python SDK Documentation](https://minlee0210.github.io/SignetDSA/python/) for FROST threshold ceremonies, BLS aggregation, and Ethereum `ecrecover`.
 
 ---
 

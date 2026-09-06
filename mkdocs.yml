@@ -97,5 +97,6 @@ nav:
     - Public-Key Recovery: features/recovery.md
     - BLS Aggregation: features/aggregation.md
   - CLI: cli.md
+  - Python SDK: python.md
   - Security & Interoperability: security.md
   - Design & Architecture: architecture.md

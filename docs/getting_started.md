@@ -28,6 +28,14 @@ repository:
     cargo test
     ```
 
+=== "Python (pip)"
+
+    ```bash
+    pip install git+https://github.com/MinLee0210/SignetDSA.git
+    # Or locally:
+    cd SignetDSA && pip install .
+    ```
+
 !!! note "Crate name casing"
     The crate is named `SignetDSA` (capitalized, matching the package name in
     `Cargo.toml`) rather than the conventional `snake_case` — that's an
@@ -110,3 +118,4 @@ list of names and aliases, and why the two traits exist side by side.
 - **[FROST](algorithms/frost.md)** — threshold signing, if no single party should hold the full key
 - **[BLS](algorithms/bls.md)** — aggregate signatures, if you need to compress many signatures into one
 - **[CLI](cli.md)** — sign and verify from the shell without writing any Rust
+- **[Python SDK](python.md)** — use SignetDSA from Python with zero-copy bindings and typing stubs

@@ -46,6 +46,9 @@ pub mod envelope;
 pub mod signature;
 pub mod signet;
 
+#[cfg(feature = "python")]
+pub mod python;
+
 pub use envelope::{JwsCompact, SignetEnvelope};
 pub use signature::Signature;
 pub use signet::{Signet, SignetSigner};
