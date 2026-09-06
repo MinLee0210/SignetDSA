@@ -10,7 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_and_test:
+  rust_ci:
+    name: Rust (Format, Clippy, Test)
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -23,15 +24,64 @@ jobs:
       run: cargo fmt -- --check
 
     - name: Run Clippy
-      run: cargo clippy -- -D warnings
+      run: cargo clippy --all-targets --all-features -- -D warnings
 
-    - name: Run Tests
-      run: cargo test --verbose
+    - name: Run Rust Tests (All Features)
+      run: cargo test --all-features --verbose
 
-    - name: Build Documentation
+    - name: Build Examples
+      run: cargo check --examples
+
+    - name: Build Rust Documentation
       run: cargo doc --no-deps
 
+  python_ci:
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install stable Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install build tools & pytest
+      run: |
+        python -m pip install --upgrade pip
+        pip install maturin pytest
+
+    - name: Build & Install SignetDSA wheel
+      run: maturin develop --release
+
+    - name: Run Pytest Suite
+      run: pytest
+
+  docs_ci:
+    name: MkDocs Strict Build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install doc dependencies
+      run: pip install -r requirements-docs.txt
+    - name: Build Documentation (Strict)
+      run: mkdocs build --strict
+
   security_audit:
+    name: RustSec Security Audit
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

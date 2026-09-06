@@ -15,3 +15,4 @@ pub mod mldsa;
 pub mod rsa;
 pub mod rsa_pss;
 pub mod schnorr;
+pub mod slhdsa;

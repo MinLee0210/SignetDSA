@@ -88,9 +88,13 @@ nav:
     - FROST (Threshold): algorithms/frost.md
     - BLS (Aggregatable): algorithms/bls.md
     - ML-DSA (Post-Quantum): algorithms/mldsa.md
+    - SLH-DSA (FIPS 205): algorithms/slhdsa.md
   - Features:
     - Factory API (Signet): features/factory.md
     - Signed Envelopes & JWS: features/envelope.md
+    - JSON Web Keys (JWK & JWKS): features/jwk.md
+    - COSE Binary Envelopes: features/cose.md
+    - W3C did:key Identifiers: features/did_key.md
     - Benchmarking: features/benchmarking.md
     - PEM/DER Import-Export: features/pem.md
     - Batch Verification: features/batch_verification.md

@@ -89,6 +89,9 @@ impl Signet {
             "ed448" | "ed448-goldilocks" => Some(Box::new(adapters::Ed448Adapter)),
             "schnorr" | "bip340" => Some(Box::new(adapters::SchnorrAdapter)),
             "mldsa" | "ml-dsa" | "dilithium" => Some(Box::new(adapters::MlDsaAdapter)),
+            "slhdsa" | "slh-dsa" | "sphincs+" | "sphincs" => {
+                Some(Box::new(adapters::SlhDsaAdapter))
+            }
             "bls" | "bls12-381" => Some(Box::new(adapters::BlsAdapter)),
             _ => None,
         }
@@ -107,6 +110,7 @@ impl Signet {
             "ed448",
             "schnorr",
             "mldsa",
+            "slhdsa",
             "bls",
         ]
     }
@@ -438,6 +442,71 @@ mod adapters {
     }
 
     // -------------------------------------------------------------------------
+    // SLH-DSA-SHAKE-128f (post-quantum stateless hash signatures, FIPS 205)
+    // -------------------------------------------------------------------------
+    pub struct SlhDsaAdapter;
+
+    impl SignetSigner for SlhDsaAdapter {
+        fn name(&self) -> &'static str {
+            "slhdsa"
+        }
+
+        fn generate_keys(&self) -> (Zeroizing<Vec<u8>>, Vec<u8>) {
+            use rand::RngCore;
+            use slh_dsa::signature::Keypair;
+            use slh_dsa::{Shake128f, SigningKey};
+
+            let mut sk_seed = [0u8; 16];
+            let mut sk_prf = [0u8; 16];
+            let mut pk_seed = [0u8; 16];
+            OsRng.fill_bytes(&mut sk_seed);
+            OsRng.fill_bytes(&mut sk_prf);
+            OsRng.fill_bytes(&mut pk_seed);
+
+            let sk = SigningKey::<Shake128f>::slh_keygen_internal(&sk_seed, &sk_prf, &pk_seed);
+            let vk = sk.verifying_key();
+            (
+                Zeroizing::new(sk.to_bytes().as_slice().to_vec()),
+                vk.to_bytes().as_slice().to_vec(),
+            )
+        }
+
+        fn sign(&self, private_key: &[u8], message: &[u8]) -> Result<Vec<u8>, String> {
+            use slh_dsa::signature::Signer;
+            use slh_dsa::{Shake128f, SigningKey};
+
+            if private_key.len() < 48 {
+                return Err("SLH-DSA: private key must be at least 48 bytes".to_string());
+            }
+            let sk = SigningKey::<Shake128f>::slh_keygen_internal(
+                &private_key[0..16],
+                &private_key[16..32],
+                &private_key[32..48],
+            );
+            let sig = sk.sign(message);
+            Ok(sig.to_vec())
+        }
+
+        fn verify(
+            &self,
+            public_key: &[u8],
+            message: &[u8],
+            signature: &[u8],
+        ) -> Result<bool, String> {
+            use slh_dsa::signature::Verifier;
+            use slh_dsa::{Shake128f, VerifyingKey};
+
+            let vk = VerifyingKey::<Shake128f>::try_from(public_key)
+                .map_err(|e| format!("SLH-DSA: invalid public key bytes: {e}"))?;
+            let sig = slh_dsa::Signature::<Shake128f>::try_from(signature)
+                .map_err(|_| "SLH-DSA: invalid signature bytes".to_string())?;
+            vk.verify(message, &sig)
+                .map(|_| true)
+                .map_err(|e| e.to_string())
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // ECDSA secp256k1 (Bitcoin/Ethereum curve)  — private: 32-byte scalar,
     // public: 33-byte SEC1 compressed
     // -------------------------------------------------------------------------
@@ -728,6 +797,8 @@ mod tests {
         assert_eq!(Signet::from_name("ed25519").unwrap().name(), "eddsa");
         assert_eq!(Signet::from_name("bip340").unwrap().name(), "schnorr");
         assert_eq!(Signet::from_name("dilithium").unwrap().name(), "mldsa");
+        assert_eq!(Signet::from_name("sphincs+").unwrap().name(), "slhdsa");
+        assert_eq!(Signet::from_name("slh-dsa").unwrap().name(), "slhdsa");
     }
 
     #[test]

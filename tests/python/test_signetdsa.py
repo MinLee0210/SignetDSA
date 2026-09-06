@@ -14,12 +14,13 @@ def test_available_algorithms():
         "ed448",
         "schnorr",
         "mldsa",
+        "slhdsa",
         "bls",
     ]
     assert sorted(algos) == sorted(expected)
 
 def test_all_algorithms_roundtrip():
-    message = b"Testing SignetDSA Python bindings!"
+    message = b"Testing SignetDSA Python bindings with 12 algorithms!"
     for algo in signetdsa.Signet.available():
         signer = signetdsa.Signet.from_name(algo)
         assert signer.name == algo
@@ -78,6 +79,68 @@ def test_jws_compact_tampered():
 
     with pytest.raises(ValueError):
         signetdsa.JwsCompact.verify(tampered_token, pk)
+
+def test_jwk_and_jwks():
+    for algo in ["eddsa", "ecdsa", "ecdsa-p384", "ecdsa-secp256k1"]:
+        signer = signetdsa.Signet.from_name(algo)
+        sk, pk = signer.generate_keys()
+
+        jwk = signetdsa.Jwk.from_public_key(algo, pk)
+        assert jwk.kty in ["OKP", "EC"]
+        assert len(jwk.thumbprint()) > 0
+
+        # JSON roundtrip
+        json_str = jwk.to_json()
+        parsed_jwk = signetdsa.Jwk.from_json(json_str)
+        recovered_pk = parsed_jwk.to_public_key()
+        assert recovered_pk == pk
+
+    # Test JWKS set
+    signer1 = signetdsa.Signet.from_name("eddsa")
+    _, pk1 = signer1.generate_keys()
+    signer2 = signetdsa.Signet.from_name("ecdsa")
+    _, pk2 = signer2.generate_keys()
+
+    jwk1 = signetdsa.Jwk.from_public_key("eddsa", pk1)
+    jwk2 = signetdsa.Jwk.from_public_key("ecdsa", pk2)
+
+    jwks = signetdsa.Jwks([jwk1, jwk2])
+    jwks_json = jwks.to_json()
+    assert '"keys":[' in jwks_json
+
+    parsed_jwks = signetdsa.Jwks.from_json(jwks_json)
+    assert len(parsed_jwks.keys) == 2
+
+def test_cose_sign1():
+    for algo in ["eddsa", "ecdsa", "ecdsa-p384", "ecdsa-secp256k1"]:
+        signer = signetdsa.Signet.from_name(algo)
+        sk, pk = signer.generate_keys()
+        payload = b"Binary sensor reading: temperature=21.5C humidity=45%"
+
+        cose_bytes = signetdsa.CoseSign1.sign(algo, sk, payload)
+        assert cose_bytes[0] == 0xd2  # CBOR Tag 18
+
+        verified_payload = signetdsa.CoseSign1.verify(cose_bytes, pk)
+        assert verified_payload == payload
+
+        # Tampered message fails
+        tampered = bytearray(cose_bytes)
+        tampered[-1] ^= 0xff
+        with pytest.raises(ValueError):
+            signetdsa.CoseSign1.verify(bytes(tampered), pk)
+
+def test_did_key():
+    for algo in ["eddsa", "ecdsa-secp256k1", "ecdsa", "ecdsa-p384"]:
+        signer = signetdsa.Signet.from_name(algo)
+        _, pk = signer.generate_keys()
+
+        did = signetdsa.DidKey.to_did(algo, pk)
+        assert did.startswith("did:key:z")
+
+        doc = signetdsa.DidKey.resolve(did)
+        assert doc.did == did
+        assert doc.algo == signer.name
+        assert doc.public_key == pk
 
 def test_frost_threshold():
     message = b"Threshold multi-sig approval"

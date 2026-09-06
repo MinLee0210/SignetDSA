@@ -8,8 +8,8 @@
 //! cargo run --example post_quantum_mldsa
 //! ```
 
-use SignetDSA::algo::mldsa::MlDsa;
 use SignetDSA::Signature;
+use SignetDSA::algo::mldsa::MlDsa;
 
 fn main() {
     println!("=== SignetDSA Post-Quantum ML-DSA Example (NIST FIPS 204) ===\n");

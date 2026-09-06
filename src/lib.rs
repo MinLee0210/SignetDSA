@@ -42,13 +42,19 @@
 
 pub mod algo;
 pub mod bench;
+pub mod cose;
+pub mod did;
 pub mod envelope;
+pub mod jwk;
 pub mod signature;
 pub mod signet;
 
 #[cfg(feature = "python")]
 pub mod python;
 
+pub use cose::CoseSign1;
+pub use did::{DidKey, DidKeyDocument};
 pub use envelope::{JwsCompact, SignetEnvelope};
+pub use jwk::{Jwk, Jwks};
 pub use signature::Signature;
 pub use signet::{Signet, SignetSigner};

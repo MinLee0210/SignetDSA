@@ -10,7 +10,10 @@ use crate::algo::ecdsa_secp256k1::EcdsaSecp256k1;
 use crate::algo::eddsa::EdDsa;
 use crate::algo::frost;
 use crate::bench::{benchmark_algo, benchmark_all};
+use crate::cose::CoseSign1;
+use crate::did::{DidKey, DidKeyDocument};
 use crate::envelope::{JwsCompact, SignetEnvelope};
+use crate::jwk::{Jwk, Jwks};
 use crate::signet::{Signet, SignetSigner};
 
 /// Object-safe dynamic signature algorithm instance.
@@ -248,6 +251,214 @@ impl PyJwsCompact {
     }
 }
 
+/// JSON Web Key (JWK, RFC 7517).
+#[pyclass(name = "Jwk")]
+#[derive(Clone)]
+pub struct PyJwk {
+    pub(crate) inner: Jwk,
+}
+
+#[pymethods]
+impl PyJwk {
+    #[getter]
+    pub fn kty(&self) -> &str {
+        &self.inner.kty
+    }
+    #[getter]
+    pub fn use_(&self) -> Option<&str> {
+        self.inner.use_.as_deref()
+    }
+    #[getter]
+    pub fn alg(&self) -> Option<&str> {
+        self.inner.alg.as_deref()
+    }
+    #[getter]
+    pub fn kid(&self) -> Option<&str> {
+        self.inner.kid.as_deref()
+    }
+    #[getter]
+    pub fn crv(&self) -> Option<&str> {
+        self.inner.crv.as_deref()
+    }
+    #[getter]
+    pub fn x(&self) -> Option<&str> {
+        self.inner.x.as_deref()
+    }
+    #[getter]
+    pub fn y(&self) -> Option<&str> {
+        self.inner.y.as_deref()
+    }
+    #[getter]
+    pub fn n(&self) -> Option<&str> {
+        self.inner.n.as_deref()
+    }
+    #[getter]
+    pub fn e(&self) -> Option<&str> {
+        self.inner.e.as_deref()
+    }
+
+    /// Construct a public JWK from algorithm name and public key bytes.
+    #[staticmethod]
+    pub fn from_public_key(algo: &str, public_key: &[u8]) -> PyResult<Self> {
+        let jwk = Jwk::from_public_key(algo, public_key).map_err(PyValueError::new_err)?;
+        Ok(Self { inner: jwk })
+    }
+
+    /// Extract raw public key bytes from this JWK.
+    pub fn to_public_key<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let pk = self.inner.to_public_key().map_err(PyValueError::new_err)?;
+        Ok(PyBytes::new_bound(py, &pk))
+    }
+
+    /// Compute RFC 7638 SHA-256 JWK thumbprint.
+    pub fn thumbprint(&self) -> String {
+        self.inner.thumbprint()
+    }
+
+    /// Serialize to JSON.
+    pub fn to_json(&self) -> String {
+        self.inner.to_json()
+    }
+
+    /// Parse from JSON.
+    #[staticmethod]
+    pub fn from_json(json_str: &str) -> PyResult<Self> {
+        let jwk = Jwk::from_json(json_str).map_err(PyValueError::new_err)?;
+        Ok(Self { inner: jwk })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "<Jwk kty='{}' alg='{}' crv='{}'>",
+            self.inner.kty,
+            self.inner.alg.as_deref().unwrap_or(""),
+            self.inner.crv.as_deref().unwrap_or("")
+        )
+    }
+}
+
+/// JSON Web Key Set (JWKS, RFC 7517 §5).
+#[pyclass(name = "Jwks")]
+#[derive(Clone)]
+pub struct PyJwks {
+    pub(crate) inner: Jwks,
+}
+
+#[pymethods]
+impl PyJwks {
+    #[new]
+    pub fn new(keys: Vec<PyJwk>) -> Self {
+        Self {
+            inner: Jwks::new(keys.into_iter().map(|k| k.inner).collect()),
+        }
+    }
+
+    #[getter]
+    pub fn keys(&self) -> Vec<PyJwk> {
+        self.inner
+            .keys
+            .iter()
+            .map(|k| PyJwk { inner: k.clone() })
+            .collect()
+    }
+
+    pub fn to_json(&self) -> String {
+        self.inner.to_json()
+    }
+
+    #[staticmethod]
+    pub fn from_json(json_str: &str) -> PyResult<Self> {
+        let jwks = Jwks::from_json(json_str).map_err(PyValueError::new_err)?;
+        Ok(Self { inner: jwks })
+    }
+
+    fn __repr__(&self) -> String {
+        format!("<Jwks keys_count={}>", self.inner.keys.len())
+    }
+}
+
+/// CBOR Object Signing and Encryption (COSE_Sign1, RFC 9052).
+#[pyclass(name = "CoseSign1")]
+pub struct PyCoseSign1;
+
+#[pymethods]
+impl PyCoseSign1 {
+    /// Sign a payload into a binary COSE_Sign1 envelope (CBOR Tag 18).
+    #[staticmethod]
+    pub fn sign<'py>(
+        py: Python<'py>,
+        algo: &str,
+        private_key: &[u8],
+        payload: &[u8],
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let bytes = CoseSign1::sign(algo, private_key, payload).map_err(PyValueError::new_err)?;
+        Ok(PyBytes::new_bound(py, &bytes))
+    }
+
+    /// Verify a binary COSE_Sign1 envelope and extract payload.
+    #[staticmethod]
+    pub fn verify<'py>(
+        py: Python<'py>,
+        cose_bytes: &[u8],
+        public_key: &[u8],
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let payload = CoseSign1::verify(cose_bytes, public_key).map_err(PyValueError::new_err)?;
+        Ok(PyBytes::new_bound(py, &payload))
+    }
+}
+
+/// Resolved W3C did:key document.
+#[pyclass(name = "DidKeyDocument")]
+#[derive(Clone)]
+pub struct PyDidKeyDocument {
+    pub(crate) inner: DidKeyDocument,
+}
+
+#[pymethods]
+impl PyDidKeyDocument {
+    #[getter]
+    pub fn did(&self) -> &str {
+        &self.inner.did
+    }
+
+    #[getter]
+    pub fn algo(&self) -> &str {
+        &self.inner.algo
+    }
+
+    #[getter]
+    pub fn public_key<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
+        PyBytes::new_bound(py, &self.inner.public_key)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "<DidKeyDocument did='{}' algo='{}'>",
+            self.inner.did, self.inner.algo
+        )
+    }
+}
+
+/// W3C did:key decentralized identifier utility.
+#[pyclass(name = "DidKey")]
+pub struct PyDidKey;
+
+#[pymethods]
+impl PyDidKey {
+    /// Derive a standard W3C did:key URI from algorithm name and public key bytes.
+    #[staticmethod]
+    pub fn to_did(algo: &str, public_key: &[u8]) -> PyResult<String> {
+        DidKey::to_did(algo, public_key).map_err(PyValueError::new_err)
+    }
+
+    /// Resolve a did:key:z... URI into algorithm and public key bytes.
+    #[staticmethod]
+    pub fn resolve(did: &str) -> PyResult<PyDidKeyDocument> {
+        let doc = DidKey::resolve(did).map_err(PyValueError::new_err)?;
+        Ok(PyDidKeyDocument { inner: doc })
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Specialized Free Functions
 // ---------------------------------------------------------------------------
@@ -354,6 +565,11 @@ fn _signetdsa(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySignetSigner>()?;
     m.add_class::<PySignetEnvelope>()?;
     m.add_class::<PyJwsCompact>()?;
+    m.add_class::<PyJwk>()?;
+    m.add_class::<PyJwks>()?;
+    m.add_class::<PyCoseSign1>()?;
+    m.add_class::<PyDidKeyDocument>()?;
+    m.add_class::<PyDidKey>()?;
     m.add_class::<PyBenchmarkResult>()?;
 
     m.add_function(wrap_pyfunction!(frost_ceremony, m)?)?;

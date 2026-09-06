@@ -31,11 +31,11 @@ class Signet:
     """Factory that instantiates signature algorithm implementations by name."""
     @staticmethod
     def from_name(name: str) -> SignetSigner:
-        """Instantiate a signature scheme by name (e.g. 'ecdsa', 'eddsa', 'mldsa')."""
+        """Instantiate a signature scheme by name (e.g. 'ecdsa', 'eddsa', 'mldsa', 'slhdsa')."""
         ...
     @staticmethod
     def available() -> List[str]:
-        """Return a list of all 11 canonical algorithm names."""
+        """Return a list of all 12 canonical algorithm names."""
         ...
     @staticmethod
     def benchmark(name: str, iterations: int = 10) -> BenchmarkResult:
@@ -43,7 +43,7 @@ class Signet:
         ...
     @staticmethod
     def benchmark_all(iterations: int = 10) -> List[BenchmarkResult]:
-        """Micro-benchmark all 11 algorithms."""
+        """Micro-benchmark all 12 algorithms."""
         ...
 
 class SignetEnvelope:
@@ -78,6 +78,74 @@ class JwsCompact:
     @staticmethod
     def verify(token: str, public_key: bytes) -> bytes:
         """Verify compact JWS token and return original payload."""
+        ...
+
+class Jwk:
+    """JSON Web Key (JWK, RFC 7517)."""
+    kty: str
+    use_: Optional[str]
+    alg: Optional[str]
+    kid: Optional[str]
+    crv: Optional[str]
+    x: Optional[str]
+    y: Optional[str]
+    n: Optional[str]
+    e: Optional[str]
+
+    @staticmethod
+    def from_public_key(algo: str, public_key: bytes) -> Jwk:
+        """Create a JWK from an algorithm name and public key bytes."""
+        ...
+    def to_public_key(self) -> bytes:
+        """Extract public key bytes from this JWK."""
+        ...
+    def thumbprint(self) -> str:
+        """Compute RFC 7638 SHA-256 JWK thumbprint."""
+        ...
+    def to_json(self) -> str:
+        """Serialize JWK to JSON."""
+        ...
+    @staticmethod
+    def from_json(json_str: str) -> Jwk:
+        """Parse JWK from JSON."""
+        ...
+
+class Jwks:
+    """JSON Web Key Set (JWKS, RFC 7517 §5)."""
+    keys: List[Jwk]
+
+    def __init__(self, keys: List[Jwk]) -> None: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json_str: str) -> Jwks: ...
+
+class CoseSign1:
+    """CBOR Object Signing and Encryption (COSE_Sign1, RFC 9052)."""
+    @staticmethod
+    def sign(algo: str, private_key: bytes, payload: bytes) -> bytes:
+        """Sign payload into a binary COSE_Sign1 envelope (CBOR Tag 18)."""
+        ...
+    @staticmethod
+    def verify(cose_bytes: bytes, public_key: bytes) -> bytes:
+        """Verify a binary COSE_Sign1 envelope and extract payload."""
+        ...
+
+class DidKeyDocument:
+    """Resolved W3C did:key document."""
+    did: str
+    algo: str
+    @property
+    def public_key(self) -> bytes: ...
+
+class DidKey:
+    """W3C did:key decentralized identifier utility."""
+    @staticmethod
+    def to_did(algo: str, public_key: bytes) -> str:
+        """Derive standard W3C did:key URI from algorithm and public key bytes."""
+        ...
+    @staticmethod
+    def resolve(did: str) -> DidKeyDocument:
+        """Resolve a did:key URI to algorithm and public key bytes."""
         ...
 
 def frost_ceremony(min_signers: int, max_signers: int, message: bytes) -> bool: ...

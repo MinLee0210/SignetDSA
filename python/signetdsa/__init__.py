@@ -4,7 +4,8 @@ SignetDSA Python Bindings
 
 Enterprise-grade digital signature library in Rust with Python bindings.
 Supports classical (ECDSA, Ed25519, Ed448, RSA-PSS, Schnorr), threshold (FROST),
-aggregatable (BLS12-381), and post-quantum (ML-DSA FIPS 204) schemes.
+aggregatable (BLS12-381), and post-quantum (ML-DSA FIPS 204, SLH-DSA FIPS 205) schemes,
+alongside JWK (RFC 7517), JWS (RFC 7515), COSE (RFC 9052), and W3C did:key.
 
 Quick Start:
 ------------
@@ -21,6 +22,11 @@ from signetdsa._signetdsa import (
     SignetSigner,
     SignetEnvelope,
     JwsCompact,
+    Jwk,
+    Jwks,
+    CoseSign1,
+    DidKey,
+    DidKeyDocument,
     BenchmarkResult,
     frost_ceremony,
     frost_ceremony_2_of_3,
@@ -36,6 +42,11 @@ __all__ = [
     "SignetSigner",
     "SignetEnvelope",
     "JwsCompact",
+    "Jwk",
+    "Jwks",
+    "CoseSign1",
+    "DidKey",
+    "DidKeyDocument",
     "BenchmarkResult",
     "frost_ceremony",
     "frost_ceremony_2_of_3",

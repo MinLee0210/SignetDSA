@@ -8,15 +8,18 @@
 //! cargo run --example bls_aggregation
 //! ```
 
-use bls_signatures::Serialize;
-use SignetDSA::algo::bls::Bls;
 use SignetDSA::Signature;
+use SignetDSA::algo::bls::Bls;
+use bls_signatures::Serialize;
 
 fn main() {
     println!("=== SignetDSA BLS12-381 Signature Aggregation Example ===\n");
 
     let num_validators = 5;
-    println!("Simulating {} independent blockchain validators...", num_validators);
+    println!(
+        "Simulating {} independent blockchain validators...",
+        num_validators
+    );
 
     let mut keypairs = Vec::new();
     let mut messages = Vec::new();
@@ -32,20 +35,32 @@ fn main() {
         raw_signatures.push(sig);
     }
 
-    println!("Generated {} individual signatures (each 96 bytes).", num_validators);
-    println!("Total uncompressed signature size: {} bytes", num_validators * 96);
+    println!(
+        "Generated {} individual signatures (each 96 bytes).",
+        num_validators
+    );
+    println!(
+        "Total uncompressed signature size: {} bytes",
+        num_validators * 96
+    );
 
     // 1. Aggregate all 5 signatures into a single 96-byte BLS signature
     println!("\n1. Aggregating signatures...");
-    let aggregated_sig = Bls::aggregate_signatures(&raw_signatures)
-        .expect("signature aggregation failed");
+    let aggregated_sig =
+        Bls::aggregate_signatures(&raw_signatures).expect("signature aggregation failed");
 
-    println!("   Aggregated Signature Size: {} bytes (constant size regardless of N)", aggregated_sig.len());
+    println!(
+        "   Aggregated Signature Size: {} bytes (constant size regardless of N)",
+        aggregated_sig.len()
+    );
     assert_eq!(aggregated_sig.len(), 96);
 
     // 2. Batch verify all validator signatures against distinct messages in one step
     println!("\n2. Verifying aggregated signature over distinct messages...");
-    let public_keys: Vec<Vec<u8>> = keypairs.iter().map(|(_, pk)| pk.as_bytes().to_vec()).collect();
+    let public_keys: Vec<Vec<u8>> = keypairs
+        .iter()
+        .map(|(_, pk)| pk.as_bytes().to_vec())
+        .collect();
     let msg_slices: Vec<&[u8]> = messages.iter().map(|m| m.as_bytes()).collect();
 
     let is_valid = Bls::verify_aggregated(&aggregated_sig, &msg_slices, &public_keys)

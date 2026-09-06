@@ -56,6 +56,12 @@ bls-signatures = "0.15.0"
 # a timing side-channel in the decompose step that can leak signing-key data.
 ml-dsa = { version = "0.1", features = ["zeroize"] }
 
+# SLH-DSA (SPHINCS+, FIPS 205 stateless hash-based post-quantum)
+slh-dsa = { version = "0.2.0-rc.5", features = ["zeroize"] }
+
+# Base58BTC for W3C did:key
+bs58 = "0.5"
+
 # Hashing
 sha2 = "0.10"
 

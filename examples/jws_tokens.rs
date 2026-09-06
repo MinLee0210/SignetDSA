@@ -8,13 +8,14 @@
 //! cargo run --example jws_tokens
 //! ```
 
-use SignetDSA::{envelope::JwsCompact, Signet};
+use SignetDSA::{Signet, envelope::JwsCompact};
 
 fn main() {
     println!("=== SignetDSA JWS Compact Token Example (RFC 7515) ===\n");
 
     let algos = ["ecdsa-p384", "eddsa", "schnorr", "rsa-pss"];
-    let claims = br#"{"sub":"user_84719","iss":"auth.signetdsa.internal","role":"admin","exp":1893456000}"#;
+    let claims =
+        br#"{"sub":"user_84719","iss":"auth.signetdsa.internal","role":"admin","exp":1893456000}"#;
 
     for algo in algos {
         let signer = Signet::from_name(algo).expect("algorithm should exist");
@@ -31,7 +32,10 @@ fn main() {
         let verified_payload = JwsCompact::verify(&token, &pk).expect("JWS verification failed");
         assert_eq!(verified_payload, claims);
 
-        println!("  [✓] Verified payload: {}\n", String::from_utf8_lossy(&verified_payload));
+        println!(
+            "  [✓] Verified payload: {}\n",
+            String::from_utf8_lossy(&verified_payload)
+        );
 
         // 3. Verify tampering detection
         let mut tampered_token = token.clone();

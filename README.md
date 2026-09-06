@@ -44,12 +44,16 @@ Additionally, SignetDSA includes high-level utilities for **JSON Web Signatures 
 | **FROST** | Threshold (t-of-n) | ~128-bit | *Split shares* | 32 B (group key) | 64 B | IETF FROST Draft / BIP340 | `frost-secp256k1` |
 | **BLS (BLS12-381)** | Aggregatable | ~128-bit | 32 B | 48 B (G1) | 96 B (G2) | IRTF CFRG BLS Draft | `bls-signatures` |
 | **ML-DSA (Dilithium-65)** | Post-Quantum | NIST Level 3 (~192b) | 4032 B | 1952 B | 3309 B | NIST FIPS 204 (Module-Lattice) | `ml-dsa` |
+| **SLH-DSA (SPHINCS+)** | Post-Quantum | NIST Level 1 (~128b) | 64 B | 32 B | 17088 B | NIST FIPS 205 (Stateless Hash) | `slh-dsa` |
 
 ---
 
 ## Feature Matrix & Specialized Capabilities
 
 - **JSON Web Signatures (JWS RFC 7515)**: Compact token generation and validation (`JwsCompact`) across all supported algorithms.
+- **JSON Web Keys (JWK RFC 7517) & JWKS**: Standard JWK export, parsing, and RFC 7638 SHA-256 thumbprints for OAuth2/OIDC IDPs.
+- **COSE Binary Envelopes (RFC 9052)**: Compact CBOR `COSE_Sign1` signing and verification for IoT, WebAuthn/FIDO2 passkeys, and low-bandwidth channels.
+- **W3C `did:key` Decentralized Identifiers**: Standard `did:key:z...` derivation and resolution with multicodec headers.
 - **Signed Envelopes**: Self-verifying portable JSON messages (`SignetEnvelope`) with embedded public keys and timestamps.
 - **Micro-Benchmarking**: In-process benchmarking harness (`Signet::benchmark_all`) reporting ops/sec, latency, and key/sig byte counts.
 - **ECDSA Public-Key Recovery**: Reconstruct public keys from `(message, signature, recovery_id)` (`EcdsaSecp256k1::recover_public_key`).
