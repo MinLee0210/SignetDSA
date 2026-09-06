@@ -165,7 +165,7 @@ aggregated_sig = signetdsa.bls_aggregate_signatures(signatures)
 
 # Verify all distinct messages in a single pairing equation
 public_keys = [pk for (sk, pk) in keypairs]
-is_valid = signetdsa.bls_verify_aggregated(public_keys, messages, aggregated_sig)
+is_valid = signetdsa.bls_verify_aggregated(aggregated_sig, messages, public_keys)
 assert is_valid is True
 ```
 
@@ -182,10 +182,9 @@ signer = signetdsa.Signet.from_name("eddsa")
 pairs = [signer.generate_keys() for _ in range(5)]
 messages = [f"Batch item {i}".encode() for i in range(5)]
 signatures = [signer.sign(sk, msg) for (sk, pk), msg in zip(pairs, messages)]
-
 public_keys = [pk for (sk, pk) in pairs]
 
-assert signetdsa.eddsa_verify_batch(public_keys, messages, signatures) is True
+assert signetdsa.eddsa_verify_batch(messages, signatures, public_keys) is True
 ```
 
 ---
@@ -197,9 +196,9 @@ Benchmark all 11 algorithms directly from Python:
 ```python
 import signetdsa
 
-results = signetdsa.benchmark_all(iterations=20)
+results = signetdsa.Signet.benchmark_all(iterations=20)
 for res in results:
-    print(f"Algorithm: {res.algo_name:18} | Sign: {res.sign_ops_per_sec:10.1f} ops/s | Verify: {res.verify_ops_per_sec:10.1f} ops/s")
+    print(f"Algorithm: {res.algo:18} | Sign: {res.sign_ops_per_sec:10.1f} ops/s | Keygen: {res.keygen_ms:8.3f} ms | Sig: {res.sig_bytes:4} B")
 ```
 
 ---
