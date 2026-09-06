@@ -1,5 +1,11 @@
 # SignetDSA
 
+<div align="center">
+  <img src="assets/logo.svg" alt="SignetDSA logo" width="160"/>
+</div>
+
+<br>
+
 **SignetDSA** is a Rust library of digital signature algorithms — classical,
 threshold, aggregatable, and post-quantum — behind two APIs: a typed
 `Signature` trait for compile-time-checked usage, and a runtime `Signet`
@@ -11,7 +17,7 @@ selecting an algorithm by name.
 | Category | What you get |
 |---|---|
 | **9 factory-selectable algorithms** | RSA, DSA, ECDSA (P-256), ECDSA (secp256k1), EdDSA (Ed25519), Ed448, Schnorr (BIP340), ML-DSA, BLS |
-| **Threshold signing** | FROST — 2-round Schnorr threshold ceremony, exposed directly (not through the factory; see [Choosing an Algorithm](choosing_an_algorithm.md)) |
+| **Threshold signing** | FROST — 2-round Schnorr threshold ceremony, exposed directly (not through the factory; see [Choosing an Algorithm](learn/choosing_an_algorithm.md)) |
 | **Aggregation** | BLS aggregate signatures — many signatures collapse into one, verified in a single pairing check |
 | **Public-key recovery** | `ecrecover`-style recovery for ECDSA/secp256k1 |
 | **Batch verification** | Verify many Ed25519 `(message, key, signature)` triples faster than one at a time |
@@ -24,7 +30,7 @@ selecting an algorithm by name.
 
 ```toml
 [dependencies]
-SignetDSA = { git = "https://github.com/MinLee0210/LightDSA" }
+SignetDSA = { git = "https://github.com/MinLee0210/SignetDSA" }
 ```
 
 === "Typed API"
@@ -61,7 +67,7 @@ SignetDSA = { git = "https://github.com/MinLee0210/LightDSA" }
 ## Navigation
 
 - **[Getting Started](getting_started.md)** — installation, both APIs, first signature
-- **[Choosing an Algorithm](choosing_an_algorithm.md)** — a decision guide across all nine
+- **[Learn](learn/intuition.md)** — what a digital signature actually is, a decision guide across all nine algorithms, and a glossary
 - **[Algorithms](algorithms/rsa.md)** — one deep-dive page per algorithm: theory, code, caveats
 - **[Features](features/factory.md)** — the factory API, PEM, batch verification, recovery, aggregation
 - **[CLI](cli.md)** — the `signetdsa` command-line tool

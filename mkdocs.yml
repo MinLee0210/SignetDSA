@@ -1,12 +1,14 @@
 site_name: "SignetDSA"
 site_description: "A Rust library of digital signature algorithms — classical, threshold, aggregatable, and post-quantum — with a unified factory API."
-site_url: "https://minlee0210.github.io/LightDSA"
+site_url: "https://minlee0210.github.io/SignetDSA"
 
-repo_url: "https://github.com/MinLee0210/LightDSA"
-repo_name: "MinLee0210/LightDSA"
+repo_url: "https://github.com/MinLee0210/SignetDSA"
+repo_name: "MinLee0210/SignetDSA"
 
 theme:
   name: material
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
   palette:
     - scheme: default
       primary: deep purple
@@ -53,8 +55,11 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - Getting Started: getting_started.md
-  - Choosing an Algorithm: choosing_an_algorithm.md
+  - Getting Started:
+    - Getting Started: getting_started.md
+    - Digital Signatures, Intuition First: learn/intuition.md
+    - Choosing an Algorithm: learn/choosing_an_algorithm.md
+    - Glossary: learn/glossary.md
   - Algorithms:
     - RSA: algorithms/rsa.md
     - DSA: algorithms/dsa.md

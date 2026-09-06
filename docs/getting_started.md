@@ -9,21 +9,21 @@ repository:
 
     ```toml
     [dependencies]
-    SignetDSA = { git = "https://github.com/MinLee0210/LightDSA" }
+    SignetDSA = { git = "https://github.com/MinLee0210/SignetDSA" }
     ```
 
 === "Path dependency (local checkout)"
 
     ```toml
     [dependencies]
-    SignetDSA = { path = "../LightDSA" }
+    SignetDSA = { path = "../SignetDSA" }
     ```
 
 === "From source"
 
     ```bash
-    git clone https://github.com/MinLee0210/LightDSA.git
-    cd LightDSA
+    git clone https://github.com/MinLee0210/SignetDSA.git
+    cd SignetDSA
     cargo build
     cargo test
     ```
@@ -103,7 +103,9 @@ list of names and aliases, and why the two traits exist side by side.
 
 ## What's Next?
 
-- **[Choosing an Algorithm](choosing_an_algorithm.md)** — which of the nine fits your use case
+- **[Digital Signatures, Intuition First](learn/intuition.md)** — the concepts
+  above, explained from scratch, if any of them felt hand-wavy
+- **[Choosing an Algorithm](learn/choosing_an_algorithm.md)** — which of the nine fits your use case
 - **[RSA](algorithms/rsa.md)**, **[EdDSA](algorithms/eddsa.md)**, **[Schnorr](algorithms/schnorr.md)** — start with a classical algorithm
 - **[FROST](algorithms/frost.md)** — threshold signing, if no single party should hold the full key
 - **[BLS](algorithms/bls.md)** — aggregate signatures, if you need to compress many signatures into one

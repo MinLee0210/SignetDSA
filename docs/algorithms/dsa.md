@@ -25,6 +25,50 @@ H(m))$ and checks it matches.
     nonce generation for this — it doesn't add its own nonce derivation on
     top.
 
+## Pseudocode
+
+```text
+KeyGen(k, n):                           # k = modulus bits (2048), n = subgroup bits (256)
+    p, q  <- primes such that p is k bits, q is n bits, and q divides (p - 1)
+    g     <- element of order q in (Z/pZ)*        # generator of the subgroup
+    x     <- random in [1, q - 1]                  # private key
+    y     <- g^x mod p                             # public key
+    return (private_key = x, public_key = y, params = (p, q, g))
+
+Sign(private_key = x, params = (p, q, g), message):
+    digest <- SHA-256(message)
+    loop:
+        k_nonce <- random in [1, q - 1]            # MUST be fresh every call
+        r <- (g^k_nonce mod p) mod q
+        if r == 0: retry
+        s <- k_nonce^-1 * (digest + x * r) mod q
+        if s == 0: retry
+    return (r, s)
+
+Verify(public_key = y, params = (p, q, g), message, (r, s)):
+    if r not in [1, q-1] or s not in [1, q-1]: return false
+    digest <- SHA-256(message)
+    w   <- s^-1 mod q
+    u1  <- (digest * w) mod q
+    u2  <- (r * w) mod q
+    v   <- ((g^u1 * y^u2) mod p) mod q
+    return v == r
+```
+
+## Complexity
+
+| Operation | Cost | Why |
+|---|---|---|
+| KeyGen | $O(k^4)$ bit operations | Dominated by finding a $k$-bit prime $p$ and $n$-bit prime $q$ with $q \mid (p-1)$ — the same order of cost as RSA's prime search, and the reason `generate_keys()` is this crate's slowest |
+| Sign | $O(n \cdot k^2)$ | One modular exponentiation mod $p$, but the exponent ($k_{\text{nonce}}$) is only $n$ bits — cheaper than a full-$k$-bit-exponent exponentiation, plus a cheap $O(n^2)$ modular inverse mod $q$ |
+| Verify | $O(n \cdot k^2)$, roughly 2× signing | Two exponentiations mod $p$ with $n$-bit exponents (combinable into one multi-exponentiation), each costing about what signing's single exponentiation does |
+
+$k$ is the modulus bit length (2048), $n$ the subgroup order bit length
+(256). Because the exponents in sign/verify are only $n$ bits rather than
+the full $k$-bit modulus, DSA's sign/verify cost is closer to an
+elliptic-curve algorithm's than to RSA's — the expensive part specific to
+DSA is entirely front-loaded into key generation.
+
 ## How to Use
 
 ### Typed API

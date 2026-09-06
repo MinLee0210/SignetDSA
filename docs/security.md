@@ -29,7 +29,7 @@
 ## Continuous Auditing
 
 CI runs [`cargo audit`](https://docs.rs/cargo-audit) against the RustSec
-advisory database on every build. [`.cargo/audit.toml`](https://github.com/MinLee0210/LightDSA/blob/main/.cargo/audit.toml)
+advisory database on every build. [`.cargo/audit.toml`](https://github.com/MinLee0210/SignetDSA/blob/main/.cargo/audit.toml)
 ignores exactly one advisory — RUSTSEC-2023-0071 above, the RSA timing
 side-channel already documented as an accepted, known limitation — so CI
 reflects genuinely new findings instead of being permanently red over a
@@ -47,9 +47,9 @@ implements the actual standard:
 
 | Algorithm | Test vectors | Source |
 |---|---|---|
-| [Ed25519](algorithms/eddsa.md) | [`tests/rfc8032_ed25519.rs`](https://github.com/MinLee0210/LightDSA/blob/main/tests/rfc8032_ed25519.rs) | RFC 8032 §7.1 |
-| [Ed448](algorithms/ed448.md) | [`tests/rfc8032_ed448.rs`](https://github.com/MinLee0210/LightDSA/blob/main/tests/rfc8032_ed448.rs) | RFC 8032 §7.4 |
-| [Schnorr (BIP340)](algorithms/schnorr.md) | [`tests/bip340_schnorr.rs`](https://github.com/MinLee0210/LightDSA/blob/main/tests/bip340_schnorr.rs) | [Official BIP340 CSV](https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv), all 19 vectors including invalid-signature edge cases |
+| [Ed25519](algorithms/eddsa.md) | [`tests/rfc8032_ed25519.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/rfc8032_ed25519.rs) | RFC 8032 §7.1 |
+| [Ed448](algorithms/ed448.md) | [`tests/rfc8032_ed448.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/rfc8032_ed448.rs) | RFC 8032 §7.4 |
+| [Schnorr (BIP340)](algorithms/schnorr.md) | [`tests/bip340_schnorr.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/bip340_schnorr.rs) | [Official BIP340 CSV](https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv), all 19 vectors including invalid-signature edge cases |
 
 ### The Bug These Vectors Caught
 
@@ -72,6 +72,6 @@ vectors prove it's *correct*.
 
 This is a personal/educational project without a formal security disclosure
 process. If you find a vulnerability, open an issue on the
-[GitHub repository](https://github.com/MinLee0210/LightDSA) describing the
+[GitHub repository](https://github.com/MinLee0210/SignetDSA) describing the
 class of problem — please avoid posting a full working exploit in a public
 issue.

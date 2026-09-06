@@ -123,7 +123,7 @@ actually happening.
 
 ## CI
 
-[`.github/workflows/ci.yml`](https://github.com/MinLee0210/LightDSA/blob/main/.github/workflows/ci.yml)
+[`.github/workflows/ci.yml`](https://github.com/MinLee0210/SignetDSA/blob/main/.github/workflows/ci.yml)
 runs on every push and pull request against `main`:
 
 1. `cargo fmt -- --check`
@@ -131,5 +131,15 @@ runs on every push and pull request against `main`:
 3. `cargo test --verbose`
 4. `cargo doc --no-deps`
 5. `cargo audit` (a separate job), against the allowlist in
-   [`.cargo/audit.toml`](https://github.com/MinLee0210/LightDSA/blob/main/.cargo/audit.toml)
+   [`.cargo/audit.toml`](https://github.com/MinLee0210/SignetDSA/blob/main/.cargo/audit.toml)
    — see [Security & Interoperability](security.md#continuous-auditing).
+
+A second workflow,
+[`.github/workflows/docs.yml`](https://github.com/MinLee0210/SignetDSA/blob/main/.github/workflows/docs.yml),
+builds this documentation site with `mkdocs build --strict` and deploys it
+to GitHub Pages, on every push to `main` that touches `docs/`,
+`mkdocs.yml`, or `requirements-docs.txt` (also runnable on demand via
+`workflow_dispatch`). It uses GitHub's native Pages deployment
+(`actions/upload-pages-artifact` + `actions/deploy-pages`) rather than
+pushing a `gh-pages` branch, which needs the repository's Pages source set
+to "GitHub Actions" (Settings → Pages) rather than a branch.

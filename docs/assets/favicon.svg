@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="SignetDSA favicon">
+  <title>SignetDSA</title>
+  <circle cx="100" cy="100" r="96" fill="#4527A0"/>
+  <g fill="#FFC107">
+    <circle cx="100" cy="82" r="30"/>
+    <polygon points="100,78 122,152 78,152"/>
+  </g>
+</svg>

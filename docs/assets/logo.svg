@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="SignetDSA logo">
+  <title>SignetDSA</title>
+  <!-- Seal body -->
+  <circle cx="100" cy="100" r="94" fill="#311B92"/>
+  <circle cx="100" cy="100" r="88" fill="#4527A0"/>
+  <!-- Signet ring band -->
+  <circle cx="100" cy="100" r="94" fill="none" stroke="#FFC107" stroke-width="5"/>
+  <circle cx="100" cy="100" r="80" fill="none" stroke="#5E35B1" stroke-width="2"/>
+  <!-- Keyhole emblem: the seal's impression -->
+  <g fill="#FFC107">
+    <circle cx="100" cy="80" r="28"/>
+    <polygon points="100,76 120,150 80,150"/>
+  </g>
+</svg>

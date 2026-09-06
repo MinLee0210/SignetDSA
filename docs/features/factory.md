@@ -1,7 +1,7 @@
 # Factory API (Signet)
 
 The typed `Signature` trait (one page per algorithm — see
-[Choosing an Algorithm](../choosing_an_algorithm.md)) gives every algorithm
+[Choosing an Algorithm](../learn/choosing_an_algorithm.md)) gives every algorithm
 its own `PrivateKey`/`PublicKey`/`Error` types, checked at compile time. That
 precision comes at a cost: you can't write `Box<dyn Signature>`, because
 [associated types make a trait object-unsafe](https://doc.rust-lang.org/reference/items/traits.html#object-safety).

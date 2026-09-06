@@ -40,6 +40,54 @@ public_key.verify_prehash(message, &sig)?;
 // public_key.verify(message, &sig);
 ```
 
+## Pseudocode
+
+```text
+KeyGen():
+    d'  <- random in [1, n - 1]
+    P   <- d' * G
+    d   <- d'         if y-coordinate of P is even
+         <- n - d'     otherwise            # BIP340: public key's y is always even
+    return (private_key = d, public_key = x-coordinate of d*G)
+
+Sign(d, message):                      # aux_rand fixed to 32 zero bytes in this crate
+    t <- d XOR TaggedHash("BIP0340/aux", aux_rand)
+    rand <- TaggedHash("BIP0340/nonce", t || public_key || message)
+    k'  <- rand mod n
+    R   <- k' * G
+    k   <- k'         if y-coordinate of R is even
+         <- n - k'     otherwise
+    e   <- TaggedHash("BIP0340/challenge", R.x || public_key || message) mod n
+    s   <- (k + e * d) mod n
+    return (R.x, s)
+
+Verify(public_key, message, (r, s)):
+    e <- TaggedHash("BIP0340/challenge", r || public_key || message) mod n
+    R <- s * G - e * P                 # P reconstructed from public_key (lift_x)
+    return R is not the point at infinity
+       and y-coordinate of R is even
+       and R.x == r
+```
+
+`TaggedHash(tag, data) = SHA-256(SHA-256(tag) || SHA-256(tag) || data)` —
+domain-separates each hash use so a value computed for one purpose (a
+nonce, say) can never be replayed as if it were computed for another (a
+challenge). This is exactly the mechanism [Schnorr's `# BIP340
+conformance`](#bip340-conformance) section above depends on `message` being
+fed into directly, rather than pre-hashed by the caller first.
+
+## Complexity
+
+| Operation | Cost | Why |
+|---|---|---|
+| KeyGen | $O(\log n)$ point operations | One fixed-base scalar multiplication $d'G$ |
+| Sign | $O(\log n)$ point operations | One fixed-base scalar multiplication for the nonce point $R = k'G$; the rest is hashing and scalar arithmetic |
+| Verify | $O(\log n)$ point operations | One multi-scalar multiplication $sG - eP$, comparable in cost to [ECDSA](ecdsa_secp256k1.md#pseudocode-complexity)'s verify equation |
+
+$n$ is the secp256k1 curve order, fixed regardless of any input size — the
+same "small, fixed number of point operations in practice" property
+[ECDSA (P-256)](ecdsa.md#complexity) has.
+
 ## How to Use
 
 ### Typed API
@@ -79,7 +127,7 @@ assert!(signer.verify(&pk, b"Hello, world!", &sig).unwrap());
 Verified against the **full official BIP340 CSV test vector suite**
 (19 vectors, including its invalid-signature edge cases — a public key not
 on the curve, a negated `s` value, non-canonical field elements, and more)
-in [`tests/bip340_schnorr.rs`](https://github.com/MinLee0210/LightDSA/blob/main/tests/bip340_schnorr.rs).
+in [`tests/bip340_schnorr.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/tests/bip340_schnorr.rs).
 See [Security & Interoperability](../security.md).
 
 ## Errors

@@ -7,9 +7,9 @@ authors = ["Minh, Le Duc"]
 license = "MIT"
 keywords = ["cryptography", "signature", "ecdsa", "bls", "post-quantum"]
 categories = ["cryptography"]
-repository = "https://github.com/MinLee0210/LightDSA"
-homepage = "https://github.com/MinLee0210/LightDSA"
-documentation = "https://docs.rs/LightDSA"
+repository = "https://github.com/MinLee0210/SignetDSA"
+homepage = "https://github.com/MinLee0210/SignetDSA"
+documentation = "https://docs.rs/SignetDSA"
 readme = "README.md"
 rust-version = "1.85"
 

@@ -5,14 +5,25 @@ and post-quantum — backed by the RustCrypto ecosystem crates.
 
 ## Documentation
 
-Full docs (per-algorithm deep dives, feature guides, CLI reference, security
-notes, architecture) live under [`docs/`](docs/), built with
-[MkDocs](https://www.mkdocs.org/) + [Material](https://squidfunk.github.io/mkdocs-material/):
+**https://minlee0210.github.io/SignetDSA** — per-algorithm deep dives
+(theory, pseudocode, complexity), feature guides, a CLI reference, security
+notes, and architecture. Built with [MkDocs](https://www.mkdocs.org/) +
+[Material](https://squidfunk.github.io/mkdocs-material/) from
+[`docs/`](docs/), and deployed to GitHub Pages by
+[`.github/workflows/docs.yml`](.github/workflows/docs.yml) on every push to
+`main` that touches `docs/` or `mkdocs.yml`.
+
+To run it locally:
 
 ```bash
-pip install mkdocs-material
+pip install -r requirements-docs.txt
 mkdocs serve   # http://127.0.0.1:8000
 ```
+
+The Pages site itself needs a one-time setup step in the repo: **Settings →
+Pages → Build and deployment → Source → "GitHub Actions"**. Until that's
+set, the workflow will build successfully but the deploy step will fail
+with a permissions/environment error.
 
 ## Algorithms
 

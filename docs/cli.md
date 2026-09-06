@@ -1,6 +1,6 @@
 # CLI
 
-The `signetdsa` binary ([`src/bin/signetdsa.rs`](https://github.com/MinLee0210/LightDSA/blob/main/src/bin/signetdsa.rs))
+The `signetdsa` binary ([`src/bin/signetdsa.rs`](https://github.com/MinLee0210/SignetDSA/blob/main/src/bin/signetdsa.rs))
 exposes the [factory API](features/factory.md) from the shell — generate
 keys, sign, and verify, for any algorithm `Signet::available()` knows about,
 without writing any Rust. Keys and signatures are stored as hex-encoded text

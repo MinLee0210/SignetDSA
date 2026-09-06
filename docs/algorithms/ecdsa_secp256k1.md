@@ -40,6 +40,34 @@ assert_eq!(recovered, public_key);
 See [Public-Key Recovery](../features/recovery.md) for the full mechanics
 and its security caveats.
 
+## Pseudocode & Complexity
+
+KeyGen/Sign/Verify are the exact same algorithm as
+[ECDSA (P-256)](ecdsa.md#pseudocode) — same pseudocode, same $O(\log n)$
+point-operation complexity, just with `secp256k1`'s curve parameters $(G,
+n)$ instead of P-256's. What's specific to this module is recovery:
+
+```text
+SignRecoverable(d, message):
+    (r, s) <- Sign(d, message)          # as in ECDSA (P-256)
+    (x1, y1) <- k * G                   # the same point computed during Sign
+    recovery_id <- 2 bits encoding:
+        - whether x1 == r exactly, or x1 == r + n (rare, x1 wrapped past the field)
+        - whether y1 is even or odd
+    return (r, s), recovery_id
+
+RecoverPublicKey(message, (r, s), recovery_id):
+    reconstruct (x1, y1) from r and recovery_id  # 1 point decompression
+    z  <- SHA-256(message) mod n
+    Q  <- r^-1 * (s * (x1, y1) - z * G)  # 2 scalar multiplications
+    return Q
+```
+
+Recovery costs about the same as ordinary verification — a small, fixed
+number of scalar multiplications and one point decompression — not
+noticeably cheaper or more expensive in complexity class, just a different
+computation that happens to need no separately-transmitted public key.
+
 ## How to Use
 
 ### Typed API (ordinary sign/verify)

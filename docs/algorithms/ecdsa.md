@@ -23,6 +23,50 @@ $$
 Verification recomputes the curve point from $(r, s, Q, z)$ and checks its
 $x$-coordinate matches $r$.
 
+## Pseudocode
+
+```text
+KeyGen():
+    d <- random in [1, n - 1]           # private key
+    Q <- d * G                          # public key (one scalar multiplication)
+    return (d, Q)
+
+Sign(d, message):
+    z <- SHA-256(message) mod n
+    loop:
+        k <- random in [1, n - 1]       # MUST be fresh every call
+        (x1, _) <- k * G
+        r <- x1 mod n
+        if r == 0: retry
+        s <- k^-1 * (z + r * d) mod n
+        if s == 0: retry
+    return (r, s)
+
+Verify(Q, message, (r, s)):
+    if r not in [1, n-1] or s not in [1, n-1]: return false
+    z    <- SHA-256(message) mod n
+    w    <- s^-1 mod n
+    u1   <- z * w mod n
+    u2   <- r * w mod n
+    (x1, _) <- u1 * G + u2 * Q          # multi-scalar multiplication
+    return (x1 mod n) == r
+```
+
+## Complexity
+
+| Operation | Cost | Why |
+|---|---|---|
+| KeyGen | $O(\log n)$ point operations | One scalar multiplication $dG$, via double-and-add (or the `p256` crate's constant-time equivalent) |
+| Sign | $O(\log n)$ point operations | One scalar multiplication $kG$ dominates; the modular inverse and multiplications that follow are comparatively cheap |
+| Verify | $O(\log n)$ point operations, ~2× signing | A multi-scalar multiplication $u_1 G + u_2 Q$ — computable together more cheaply than two separate scalar multiplications, but still roughly twice sign's cost |
+
+$n$ is the curve order (a fixed ~256-bit constant for P-256), so in practice
+every operation above runs in a small, fixed number of point operations —
+the $\log n$ term doesn't grow with anything in your program, unlike RSA/DSA
+where the equivalent exponent size is tied to a key size you might
+reasonably want to increase. This is the core reason elliptic-curve
+algorithms get RSA-equivalent security from far smaller keys.
+
 ## How to Use
 
 ### Typed API

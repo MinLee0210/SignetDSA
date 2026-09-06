@@ -24,6 +24,45 @@ the SHA-256 digest of the message in a fixed structure before this
 exponentiation, so that a valid padded value can't easily be forged without
 knowing $d$.
 
+## Pseudocode
+
+```text
+KeyGen(k):                              # k = modulus bit length (2048)
+    p, q  <- two random primes, each ~k/2 bits, with p != q
+    n     <- p * q
+    phi   <- (p - 1) * (q - 1)
+    e     <- 65537                      # fixed public exponent
+    d     <- e^-1 mod phi               # modular inverse
+    return (private_key = (d, n), public_key = (e, n))
+
+Sign(private_key = (d, n), message):
+    digest  <- SHA-256(message)
+    padded  <- PKCS1v15_Pad(digest)     # fixed-structure padding around the digest
+    s       <- padded^d mod n
+    return s
+
+Verify(public_key = (e, n), message, s):
+    digest       <- SHA-256(message)
+    expected     <- PKCS1v15_Pad(digest)
+    recovered    <- s^e mod n
+    return recovered == expected
+```
+
+## Complexity
+
+| Operation | Cost | Why |
+|---|---|---|
+| KeyGen | $O(k^4)$ bit operations | Dominated by finding two ~1024-bit probable primes via repeated Miller-Rabin testing — by far the most expensive operation in this crate |
+| Sign | One full-length modular exponentiation, $O(k^3)$ with schoolbook arithmetic | Private exponent $d$ is a full $k$-bit number — every one of its bits costs a squaring, and about half cost an extra multiplication too |
+| Verify | One modular exponentiation with small $e$, $O(k^2 \log e)$ | $e = 65537 = 2^{16}+1$ needs only 17 squarings total, regardless of key size — verification is dramatically cheaper than signing |
+
+$k$ is the modulus bit length (2048 here). In production RSA implementations
+(including the `rsa` crate this module wraps) signing is typically
+accelerated further using the Chinese Remainder Theorem — computing two
+half-size ($k/2$-bit) exponentiations mod $p$ and $q$ separately and
+combining them, roughly a 4× speedup over the naive full-modulus
+exponentiation shown above — but the asymptotic class doesn't change.
+
 ## How to Use
 
 ### Typed API
